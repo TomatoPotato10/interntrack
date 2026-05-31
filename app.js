@@ -1,0 +1,1194 @@
+// app.js
+// Main Controller for InternTrack — No authentication, pure local storage.
+
+import {
+  getApplications,
+  addApplication,
+  updateApplication,
+  deleteApplication,
+  getReminders,
+  addReminder,
+  updateReminder,
+  deleteReminder
+} from "./firebase-config.js";
+
+// ==================== STATE MANAGEMENT ====================
+let applications = [];
+let reminders = [];
+let activeFilter = "all";
+let searchQuery = "";
+let currentSort = "date-desc";
+let selectedFormStatus = "Applied";
+let activeHomeSubView = "overview"; // 'overview' or 'analytics'
+
+// ==================== ELEMENT SELECTORS ====================
+const DOM = {
+  // Views & Routing
+  homeView: document.getElementById("home-view"),
+  applicationsView: document.getElementById("applications-view"),
+  remindersView: document.getElementById("reminders-view"),
+  bottomNav: document.getElementById("bottom-nav"),
+  
+  // Dashboard Sub-Views Toggle
+  btnHomeOverview: document.getElementById("btn-home-overview"),
+  btnHomeAnalytics: document.getElementById("btn-home-analytics"),
+  homeOverviewContainer: document.getElementById("home-overview-container"),
+  homeAnalyticsContainer: document.getElementById("home-analytics-container"),
+  
+  // Dashboard Overviews
+  userWelcomeName: document.getElementById("user-welcome-name"),
+  statsApplied: document.getElementById("stats-applied"),
+  statsInterview: document.getElementById("stats-interview"),
+  statsOffer: document.getElementById("stats-offer"),
+  statsRejected: document.getElementById("stats-rejected"),
+  statsAwaiting: document.getElementById("stats-awaiting"),
+  successRatePct: document.getElementById("success-rate-pct"),
+  summaryCircle: document.getElementById("summary-circle"),
+  summaryHeadline: document.getElementById("summary-headline"),
+  summaryMessage: document.getElementById("summary-message"),
+  recentAppsList: document.getElementById("recent-apps-list"),
+  viewAllAppsBtn: document.getElementById("view-all-apps-btn"),
+  
+  // Analytics subtab elements
+  analyticsInterviewRate: document.getElementById("analytics-interview-rate"),
+  analyticsOfferRate: document.getElementById("analytics-offer-rate"),
+  analyticsRejectionRate: document.getElementById("analytics-rejection-rate"),
+  barInterviewRate: document.getElementById("bar-interview-rate"),
+  barOfferRate: document.getElementById("bar-offer-rate"),
+  barRejectionRate: document.getElementById("bar-rejection-rate"),
+  analyticsMonthCount: document.getElementById("analytics-month-count"),
+  statusDistributionChart: document.getElementById("status-distribution-chart"),
+  
+  // Applications Catalog
+  appsCountSub: document.getElementById("apps-count-sub"),
+  appSearch: document.getElementById("app-search"),
+  appSort: document.getElementById("app-sort"),
+  filterPills: document.querySelectorAll(".filter-pill"),
+  appsList: document.getElementById("apps-list"),
+  fabAddApp: document.getElementById("fab-add-app"),
+  
+  // Reminders View
+  btnRequestNotifications: document.getElementById("btn-request-notifications"),
+  reminderFormToggle: document.getElementById("reminder-form-toggle"),
+  reminderFormChevron: document.getElementById("reminder-form-chevron"),
+  reminderForm: document.getElementById("reminder-form"),
+  remAppId: document.getElementById("rem-app-id"),
+  remTitle: document.getElementById("rem-title"),
+  remDate: document.getElementById("rem-date"),
+  remType: document.getElementById("rem-type"),
+  upcomingRemindersList: document.getElementById("upcoming-reminders-list"),
+  completedRemindersList: document.getElementById("completed-reminders-list"),
+  
+  // Theme Toggle & Export
+  btnToggleTheme: document.getElementById("btn-toggle-theme"),
+  btnExportCsv: document.getElementById("btn-export-csv"),
+  btnExportCsvAnalytics: document.getElementById("btn-export-csv-analytics"),
+  
+  // Application Details Overlay Card
+  detailsOverlay: document.getElementById("details-overlay"),
+  detailsCloseBtn: document.getElementById("details-close-btn"),
+  detailsCompanyName: document.getElementById("details-company-name"),
+  detailsRoleName: document.getElementById("details-role-name"),
+  detailsStatusBadge: document.getElementById("details-status-badge"),
+  detailsLinkWrapper: document.getElementById("details-link-wrapper"),
+  detailsLocationText: document.getElementById("details-location-text"),
+  detailsDateText: document.getElementById("details-date-text"),
+  detailsInterviewBlock: document.getElementById("details-interview-block"),
+  detailsInterviewDate: document.getElementById("details-interview-date"),
+  detailsInterviewType: document.getElementById("details-interview-type"),
+  detailsInterviewNotes: document.getElementById("details-interview-notes"),
+  detailsTimelineTree: document.getElementById("details-timeline-tree"),
+  detailsNotesText: document.getElementById("details-notes-text"),
+  btnDetailsEdit: document.getElementById("btn-details-edit"),
+  btnDetailsDelete: document.getElementById("btn-details-delete"),
+  detailsRecruiterBlock: document.getElementById("details-recruiter-block"),
+  detailsRecruiterName: document.getElementById("details-recruiter-name"),
+  detailsRecruiterEmailWrapper: document.getElementById("details-recruiter-email-wrapper"),
+  
+  // Drawer Sheet
+  appModalOverlay: document.getElementById("app-modal-overlay"),
+  appDrawer: document.getElementById("app-drawer"),
+  drawerTitle: document.getElementById("drawer-title"),
+  drawerCloseBtn: document.getElementById("drawer-close-btn"),
+  appForm: document.getElementById("app-form"),
+  appFormId: document.getElementById("app-form-id"),
+  appCompany: document.getElementById("app-company"),
+  appRole: document.getElementById("app-role"),
+  appLocation: document.getElementById("app-location"),
+  appLink: document.getElementById("app-link"),
+  appDate: document.getElementById("app-date"),
+  appStatusSelector: document.getElementById("app-drawer").querySelector(".status-selector-grid"),
+  formInterviewGroup: document.getElementById("form-interview-group"),
+  appInterviewDate: document.getElementById("app-interview-date"),
+  appInterviewType: document.getElementById("app-interview-type"),
+  appInterviewNotes: document.getElementById("app-interview-notes"),
+  appNotes: document.getElementById("app-notes"),
+  btnSaveLabel: document.getElementById("btn-save-label"),
+  appRecruiterName: document.getElementById("app-recruiter-name"),
+  appRecruiterEmail: document.getElementById("app-recruiter-email"),
+  
+  // Alerts Notifications
+  toastContainer: document.getElementById("toast-container")
+};
+
+// ==================== INITIAL THEME SETUP ====================
+const savedTheme = localStorage.getItem("interntrack_theme") || "dark";
+if (savedTheme === "light") {
+  document.body.classList.add("light-mode");
+  updateThemeButtonUI(true);
+} else {
+  updateThemeButtonUI(false);
+}
+
+function updateThemeButtonUI(isLight) {
+  if (isLight) {
+    DOM.btnToggleTheme.innerHTML = `<i class="fa-solid fa-sun"></i>`;
+    DOM.btnToggleTheme.title = "Switch to Dark Mode";
+  } else {
+    DOM.btnToggleTheme.innerHTML = `<i class="fa-solid fa-moon"></i>`;
+    DOM.btnToggleTheme.title = "Switch to Light Mode";
+  }
+}
+
+DOM.btnToggleTheme.addEventListener("click", () => {
+  const isLight = document.body.classList.toggle("light-mode");
+  localStorage.setItem("interntrack_theme", isLight ? "light" : "dark");
+  updateThemeButtonUI(isLight);
+  showToast(`Switched to ${isLight ? "Light Theme" : "Dark Theme"}.`, "info");
+});
+
+// ==================== ROUTING & NAVIGATION ====================
+function showView(viewId) {
+  document.querySelectorAll(".view").forEach(view => {
+    view.classList.remove("active");
+  });
+  
+  const targetView = document.getElementById(viewId);
+  if (targetView) {
+    targetView.classList.add("active");
+    targetView.scrollTop = 0;
+  }
+  
+  DOM.bottomNav.style.display = "flex";
+  document.querySelectorAll(".nav-tab").forEach(tab => {
+    tab.classList.remove("active");
+    if (tab.getAttribute("data-view") === viewId) {
+      tab.classList.add("active");
+    }
+  });
+}
+
+document.querySelectorAll(".nav-tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    const targetView = tab.getAttribute("data-view");
+    showView(targetView);
+  });
+});
+
+DOM.viewAllAppsBtn.addEventListener("click", () => showView("applications-view"));
+
+// Segmented switch dashboard tabs
+DOM.btnHomeOverview.addEventListener("click", () => {
+  activeHomeSubView = "overview";
+  DOM.btnHomeOverview.classList.add("active");
+  DOM.btnHomeAnalytics.classList.remove("active");
+  DOM.homeOverviewContainer.style.display = "block";
+  DOM.homeAnalyticsContainer.style.display = "none";
+});
+
+DOM.btnHomeAnalytics.addEventListener("click", () => {
+  activeHomeSubView = "analytics";
+  DOM.btnHomeAnalytics.classList.add("active");
+  DOM.btnHomeOverview.classList.remove("active");
+  DOM.homeOverviewContainer.style.display = "none";
+  DOM.homeAnalyticsContainer.style.display = "block";
+  renderAnalytics();
+});
+
+// ==================== UTILITY: TOAST NOTIFICATIONS ====================
+function showToast(message, type = "info") {
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  
+  let iconClass = "fa-circle-info";
+  if (type === "success") iconClass = "fa-circle-check";
+  if (type === "error") iconClass = "fa-triangle-exclamation";
+  
+  toast.innerHTML = `
+    <i class="fa-solid ${iconClass}"></i>
+    <span>${message}</span>
+  `;
+  
+  DOM.toastContainer.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.classList.add("fade-out");
+    toast.addEventListener("animationend", () => toast.remove());
+    setTimeout(() => toast.remove(), 400);
+  }, 3200);
+}
+
+// ==================== APP CRUD & BOTTOM DRAWER LOGIC ====================
+function openDrawer(isEdit = false, appObj = null) {
+  // Hide details view if open
+  DOM.detailsOverlay.classList.remove("active");
+  
+  DOM.appModalOverlay.classList.add("active");
+  DOM.appDrawer.classList.add("active");
+  
+  if (isEdit && appObj) {
+    DOM.drawerTitle.textContent = "Edit Application";
+    DOM.btnSaveLabel.textContent = "Save Changes";
+    DOM.appFormId.value = appObj.id;
+    DOM.appCompany.value = appObj.company;
+    DOM.appRole.value = appObj.role;
+    DOM.appLocation.value = appObj.location || "";
+    DOM.appLink.value = appObj.appLink || "";
+    DOM.appDate.value = appObj.dateApplied || "";
+    DOM.appNotes.value = appObj.notes || "";
+    DOM.appRecruiterName.value = appObj.recruiterName || "";
+    DOM.appRecruiterEmail.value = appObj.recruiterEmail || "";
+    
+    selectStatusButton(appObj.status);
+    
+    // Pop interview fields
+    if (appObj.interviewDetails) {
+      DOM.appInterviewDate.value = appObj.interviewDetails.date || "";
+      DOM.appInterviewType.value = appObj.interviewDetails.type || "";
+      DOM.appInterviewNotes.value = appObj.interviewDetails.notes || "";
+    } else {
+      DOM.appInterviewDate.value = "";
+      DOM.appInterviewType.value = "";
+      DOM.appInterviewNotes.value = "";
+    }
+  } else {
+    DOM.drawerTitle.textContent = "Add Application";
+    DOM.btnSaveLabel.textContent = "Save Application";
+    DOM.appForm.reset();
+    DOM.appFormId.value = "";
+    DOM.appRecruiterName.value = "";
+    DOM.appRecruiterEmail.value = "";
+    DOM.appInterviewDate.value = "";
+    DOM.appInterviewType.value = "";
+    DOM.appInterviewNotes.value = "";
+    
+    const today = new Date().toISOString().split("T")[0];
+    DOM.appDate.value = today;
+    selectStatusButton("Applied");
+  }
+}
+
+function closeDrawer() {
+  DOM.appModalOverlay.classList.remove("active");
+  DOM.appDrawer.classList.remove("active");
+}
+
+DOM.fabAddApp.addEventListener("click", () => openDrawer(false));
+DOM.drawerCloseBtn.addEventListener("click", closeDrawer);
+DOM.appModalOverlay.addEventListener("click", closeDrawer);
+
+// Custom status buttons events
+DOM.appStatusSelector.querySelectorAll(".status-select-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const status = btn.getAttribute("data-status");
+    selectStatusButton(status);
+  });
+});
+
+function selectStatusButton(status) {
+  selectedFormStatus = status;
+  DOM.appStatusSelector.querySelectorAll(".status-select-btn").forEach(btn => {
+    btn.classList.remove("active");
+    if (btn.getAttribute("data-status").toLowerCase() === status.toLowerCase()) {
+      btn.classList.add("active");
+    }
+  });
+  
+  // Toggle interview group view conditionally in form
+  if (status.toLowerCase() === "interview") {
+    DOM.formInterviewGroup.style.display = "block";
+  } else {
+    DOM.formInterviewGroup.style.display = "none";
+  }
+}
+
+// Add/Edit App Form Submission
+DOM.appForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  
+  const appId = DOM.appFormId.value;
+  const company = DOM.appCompany.value.trim();
+  const role = DOM.appRole.value.trim();
+  const location = DOM.appLocation.value.trim();
+  const appUrl = DOM.appLink.value.trim();
+  const dateApplied = DOM.appDate.value;
+  const notes = DOM.appNotes.value.trim();
+  const recruiterName = DOM.appRecruiterName.value.trim();
+  const recruiterEmail = DOM.appRecruiterEmail.value.trim();
+  
+  // Handle optional interview fields
+  let interviewDetails = null;
+  if (selectedFormStatus.toLowerCase() === "interview") {
+    interviewDetails = {
+      date: DOM.appInterviewDate.value,
+      type: DOM.appInterviewType.value.trim(),
+      notes: DOM.appInterviewNotes.value.trim()
+    };
+  }
+  
+  // Submit state UI
+  const submitBtn = DOM.appForm.querySelector("button[type='submit']");
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Saving...</span>`;
+  
+  try {
+    let timelineDate = dateApplied || new Date().toISOString().split("T")[0];
+    
+    if (appId) {
+      // EDIT MODE
+      const existingApp = applications.find(a => a.id === appId);
+      let updatedHistory = existingApp.statusHistory || [];
+      
+      // If status changed, append to timeline history
+      if (existingApp.status !== selectedFormStatus) {
+        updatedHistory.push({
+          status: selectedFormStatus,
+          date: new Date().toISOString().split("T")[0]
+        });
+      }
+      
+      const appData = {
+        company,
+        role,
+        location,
+        appLink: appUrl,
+        dateApplied,
+        status: selectedFormStatus,
+        notes,
+        recruiterName,
+        recruiterEmail,
+        statusHistory: updatedHistory,
+        interviewDetails
+      };
+      
+      await updateApplication(appId, appData);
+      showToast(`Updated ${company} application details!`, "success");
+    } else {
+      // NEW APPLICATION MODE
+      const initialHistory = [{
+        status: selectedFormStatus,
+        date: timelineDate
+      }];
+      
+      const appData = {
+        company,
+        role,
+        location,
+        appLink: appUrl,
+        dateApplied,
+        status: selectedFormStatus,
+        notes,
+        recruiterName,
+        recruiterEmail,
+        statusHistory: initialHistory,
+        interviewDetails
+      };
+      
+      await addApplication(appData);
+      showToast(`Logged application to ${company}!`, "success");
+    }
+    
+    closeDrawer();
+    await loadApplicationData();
+    await loadReminderData(); // Refresh selection drops
+  } catch (err) {
+    console.error("Save application error:", err);
+    showToast("Error updating database.", "error");
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> <span id="btn-save-label">Save Application</span>`;
+  }
+});
+
+// Load application items
+async function loadApplicationData() {
+  try {
+    applications = await getApplications();
+    renderDashboard();
+    renderApplicationsList();
+    populateReminderAppsDropdown();
+  } catch (err) {
+    console.error("Failed to load application data:", err);
+    showToast("Failed to fetch database.", "error");
+  }
+}
+
+// ==================== RENDERING COMPONENT BUILDERS ====================
+
+// 1. Render Dashboard/Home Stats
+function renderDashboard() {
+  const stats = {
+    wishlist: 0,
+    applied: 0,
+    oa: 0,
+    interview: 0,
+    offer: 0,
+    accepted: 0,
+    rejected: 0,
+    submitted: 0, // total submitted = everything except Wishlist
+    awaiting: 0   // awaiting = Applied + OA + Interview
+  };
+  
+  applications.forEach(app => {
+    const status = app.status.toLowerCase();
+    
+    if (status === "wishlist") stats.wishlist++;
+    else {
+      stats.submitted++;
+      
+      if (status === "applied") { stats.applied++; stats.awaiting++; }
+      else if (status === "online assessment") { stats.oa++; stats.awaiting++; }
+      else if (status === "interview") { stats.interview++; stats.awaiting++; }
+      else if (status === "offer") stats.offer++;
+      else if (status === "accepted") stats.accepted++;
+      else if (status === "rejected") stats.rejected++;
+    }
+  });
+  
+  // Set UI stats numbers
+  DOM.statsApplied.textContent = stats.submitted;
+  DOM.statsInterview.textContent = stats.interview;
+  DOM.statsOffer.textContent = stats.offer + stats.accepted;
+  DOM.statsRejected.textContent = stats.rejected;
+  DOM.statsAwaiting.textContent = stats.awaiting;
+  
+  // Conversion Ring (Offer + Accepted / Total Submitted)
+  const offerRate = stats.submitted > 0 ? Math.round(((stats.offer + stats.accepted) / stats.submitted) * 100) : 0;
+  DOM.successRatePct.textContent = `${offerRate}%`;
+  
+  const strokeDash = 201; // Circumference
+  const offset = strokeDash - (offerRate / 100) * strokeDash;
+  DOM.summaryCircle.style.strokeDashoffset = offset;
+  
+  // Dynamic summary descriptions
+  if (stats.submitted === 0) {
+    DOM.summaryHeadline.textContent = "Pipeline Empty";
+    DOM.summaryMessage.textContent = "You haven't logged any applications yet. Tap the + button to add your first one!";
+  } else if (stats.accepted > 0) {
+    DOM.summaryHeadline.textContent = "Congratulations! 🏆";
+    DOM.summaryMessage.textContent = `You have accepted an offer! All your hard work has paid off.`;
+  } else if (stats.offer > 0) {
+    DOM.summaryHeadline.textContent = "Offers Secured! 🎉";
+    DOM.summaryMessage.textContent = `You have ${stats.offer} active offer(s) waiting. Prepare your negotiation plans!`;
+  } else if (stats.interview > 0) {
+    DOM.summaryHeadline.textContent = "Active Interviewing 🚀";
+    DOM.summaryMessage.textContent = `You have ${stats.interview} interview cycles scheduled. Prepare thoroughly!`;
+  } else {
+    DOM.summaryHeadline.textContent = "Keep Submitting!";
+    DOM.summaryMessage.textContent = `${stats.submitted} applications submitted. Build a daily habit of finding roles.`;
+  }
+  
+  // Recent applications list render
+  DOM.recentAppsList.innerHTML = "";
+  // Sort applications by dateApplied descending to find recent
+  const sortedByDate = [...applications].sort((a,b) => new Date(b.dateApplied || 0) - new Date(a.dateApplied || 0));
+  const recent = sortedByDate.slice(0, 3);
+  
+  if (recent.length === 0) {
+    DOM.recentAppsList.innerHTML = `
+      <div class="empty-state" style="padding: 20px 10px;">
+        <p>No recent activity. Click the + button to add one.</p>
+      </div>
+    `;
+    return;
+  }
+  
+  recent.forEach(app => {
+    const card = buildApplicationCard(app, false);
+    DOM.recentAppsList.appendChild(card);
+  });
+}
+
+// 2. Render Applications Screen (Catalog with search, filter, and sort)
+function renderApplicationsList() {
+  DOM.appsList.innerHTML = "";
+  
+  // Filter list
+  let filtered = applications.filter(app => {
+    // 1. Filter pill selector
+    if (activeFilter !== "all") {
+      if (app.status.toLowerCase() !== activeFilter.toLowerCase()) {
+        return false;
+      }
+    }
+    
+    // 2. Search query match
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return (
+        app.company.toLowerCase().includes(q) ||
+        app.role.toLowerCase().includes(q) ||
+        (app.location && app.location.toLowerCase().includes(q))
+      );
+    }
+    return true;
+  });
+  
+  // Sort list
+  filtered.sort((a, b) => {
+    if (currentSort === "date-desc") {
+      return new Date(b.dateApplied || 0) - new Date(a.dateApplied || 0);
+    } else if (currentSort === "date-asc") {
+      return new Date(a.dateApplied || 0) - new Date(b.dateApplied || 0);
+    } else if (currentSort === "company-asc") {
+      return a.company.localeCompare(b.company);
+    } else if (currentSort === "company-desc") {
+      return b.company.localeCompare(a.company);
+    }
+    return 0;
+  });
+  
+  DOM.appsCountSub.textContent = `${filtered.length} applications matches found`;
+  
+  if (filtered.length === 0) {
+    let msg = "No items matched your catalog filter criteria.";
+    if (applications.length === 0) {
+      msg = "You haven't logged any applications yet. Start by adding one!";
+    }
+    
+    DOM.appsList.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon"><i class="fa-regular fa-folder-open"></i></div>
+        <h3>No applications logged</h3>
+        <p>${msg}</p>
+        ${applications.length === 0 ? `<button class="btn btn-secondary" id="catalog-empty-add" style="width:auto; padding:10px 20px;">Create First Application</button>` : ""}
+      </div>
+    `;
+    
+    const addBtn = document.getElementById("catalog-empty-add");
+    if (addBtn) addBtn.addEventListener("click", () => openDrawer(false));
+    return;
+  }
+  
+  filtered.forEach(app => {
+    const card = buildApplicationCard(app, true);
+    DOM.appsList.appendChild(card);
+  });
+}
+
+// 3. Application Card builder
+function buildApplicationCard(app, bindClick = true) {
+  const card = document.createElement("div");
+  const statusClass = app.status.toLowerCase().replace(" ", "-");
+  card.className = `app-card ${statusClass}`;
+  
+  if (bindClick) {
+    card.style.cursor = "pointer";
+    card.addEventListener("click", (e) => {
+      if (e.target.closest(".app-action-btn")) return;
+      showApplicationDetails(app.id);
+    });
+  }
+  
+  let dateStr = "Wishlist (No date)";
+  if (app.dateApplied) {
+    const options = { month: "short", day: "numeric", year: "numeric" };
+    dateStr = new Date(app.dateApplied).toLocaleDateString("en-US", options);
+  }
+  
+  // Custom display tag
+  let displayStatus = app.status;
+  if (displayStatus === "Online Assessment") displayStatus = "OA";
+  
+  card.innerHTML = `
+    <div class="app-card-header">
+      <div>
+        <h4 class="app-company-name">${escapeHTML(app.company)}</h4>
+        <div class="app-role">${escapeHTML(app.role)}</div>
+      </div>
+      <span class="status-badge ${statusClass}">${displayStatus}</span>
+    </div>
+    
+    <div class="app-card-details">
+      <div class="app-detail-item">
+        <i class="fa-solid fa-location-dot"></i>
+        <span>${escapeHTML(app.location || "Remote")}</span>
+      </div>
+      <div class="app-detail-item">
+        <i class="fa-regular fa-calendar-check"></i>
+        <span>${dateStr}</span>
+      </div>
+    </div>
+    
+    ${app.notes ? `<div class="app-notes-preview">${escapeHTML(app.notes)}</div>` : ""}
+  `;
+  
+  return card;
+}
+
+// ==================== APPLICATION DETAILS OVERLAY VIEWS ====================
+let currentSelectedAppId = null;
+
+function showApplicationDetails(appId) {
+  const app = applications.find(a => a.id === appId);
+  if (!app) return;
+  
+  currentSelectedAppId = appId;
+  
+  DOM.detailsCompanyName.textContent = app.company;
+  DOM.detailsRoleName.textContent = app.role;
+  DOM.detailsLocationText.textContent = app.location || "Remote / Unknown";
+  
+  // Status Badge Class
+  const statusClass = app.status.toLowerCase().replace(" ", "-");
+  DOM.detailsStatusBadge.className = `status-badge ${statusClass}`;
+  DOM.detailsStatusBadge.textContent = app.status;
+  
+  // Date format
+  if (app.dateApplied) {
+    const options = { month: "long", day: "numeric", year: "numeric" };
+    DOM.detailsDateText.textContent = new Date(app.dateApplied).toLocaleDateString("en-US", options);
+  } else {
+    DOM.detailsDateText.textContent = "Not Applied Yet";
+  }
+  
+  // Link Builder
+  if (app.appLink) {
+    DOM.detailsLinkWrapper.innerHTML = `
+      <a href="${app.appLink}" target="_blank" class="app-action-btn" style="color: var(--color-accent); text-decoration:none; font-weight:600; font-size:0.82rem; display:flex; align-items:center; gap:6px;">
+        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+        <span>Job Listing Link</span>
+      </a>
+    `;
+  } else {
+    DOM.detailsLinkWrapper.innerHTML = `<span style="font-size:0.75rem; color:var(--color-muted);">No listing link saved</span>`;
+  }
+  
+  // Timeline building
+  DOM.detailsTimelineTree.innerHTML = "";
+  const history = app.statusHistory || [];
+  
+  if (history.length === 0) {
+    DOM.detailsTimelineTree.innerHTML = `<div style="font-size:0.75rem; color:var(--color-secondary); font-style:italic;">No progress timeline entries yet.</div>`;
+  } else {
+    history.forEach(hist => {
+      const node = document.createElement("div");
+      const histClass = hist.status.toLowerCase().replace(" ", "-");
+      node.className = `timeline-node ${histClass}`;
+      
+      const options = { month: "short", day: "numeric", year: "numeric" };
+      const formattedDate = new Date(hist.date).toLocaleDateString("en-US", options);
+      
+      node.innerHTML = `
+        <div class="timeline-node-bullet"></div>
+        <div class="timeline-node-box">
+          <div class="timeline-node-header">
+            <span>Status: ${hist.status}</span>
+          </div>
+          <div class="timeline-node-date">Updated on ${formattedDate}</div>
+        </div>
+      `;
+      DOM.detailsTimelineTree.appendChild(node);
+    });
+  }
+  
+  // Interview box display details
+  if (app.status.toLowerCase() === "interview" && app.interviewDetails && app.interviewDetails.date) {
+    DOM.detailsInterviewBlock.style.display = "block";
+    
+    const dt = new Date(app.interviewDetails.date);
+    const options = { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" };
+    DOM.detailsInterviewDate.textContent = dt.toLocaleString("en-US", options);
+    DOM.detailsInterviewType.textContent = app.interviewDetails.type || "Standard Interview";
+    DOM.detailsInterviewNotes.textContent = app.interviewDetails.notes || "No interview notes added.";
+  } else {
+    DOM.detailsInterviewBlock.style.display = "none";
+  }
+  
+  // Recruiter box display details
+  if (app.recruiterName || app.recruiterEmail) {
+    DOM.detailsRecruiterBlock.style.display = "block";
+    DOM.detailsRecruiterName.textContent = app.recruiterName || "Unknown / Not Set";
+    if (app.recruiterEmail) {
+      DOM.detailsRecruiterEmailWrapper.innerHTML = `
+        <strong>Email:</strong> 
+        <a href="mailto:${app.recruiterEmail}" style="color:var(--color-accent); text-decoration:none; font-weight:600;">
+          ${escapeHTML(app.recruiterEmail)}
+        </a>
+      `;
+    } else {
+      DOM.detailsRecruiterEmailWrapper.innerHTML = `<strong>Email:</strong> <span style="color:var(--color-muted);">Not Provided</span>`;
+    }
+  } else {
+    DOM.detailsRecruiterBlock.style.display = "none";
+  }
+  
+  // Notes
+  DOM.detailsNotesText.textContent = app.notes || "No notes logged for this job.";
+  
+  // Activate overlay screen
+  DOM.detailsOverlay.classList.add("active");
+}
+
+DOM.detailsCloseBtn.addEventListener("click", () => {
+  DOM.detailsOverlay.classList.remove("active");
+  currentSelectedAppId = null;
+});
+
+// Edit from details view
+DOM.btnDetailsEdit.addEventListener("click", () => {
+  if (currentSelectedAppId) {
+    const appObj = applications.find(a => a.id === currentSelectedAppId);
+    openDrawer(true, appObj);
+  }
+});
+
+// Delete from details view
+DOM.btnDetailsDelete.addEventListener("click", async () => {
+  if (currentSelectedAppId) {
+    const app = applications.find(a => a.id === currentSelectedAppId);
+    if (!app) return;
+    
+    const confirmDelete = confirm(`Are you sure you want to delete the ${app.company} application?`);
+    if (confirmDelete) {
+      try {
+        await deleteApplication(app.id);
+        showToast(`Deleted ${app.company} tracker records.`, "info");
+        DOM.detailsOverlay.classList.remove("active");
+        await loadApplicationData();
+        await loadReminderData();
+      } catch (err) {
+        console.error("Delete error:", err);
+        showToast("Deletion failed.", "error");
+      }
+    }
+  }
+});
+
+// ==================== SEARCH, SORT & FILTERS ====================
+DOM.appSearch.addEventListener("input", (e) => {
+  searchQuery = e.target.value;
+  renderApplicationsList();
+});
+
+DOM.appSort.addEventListener("change", (e) => {
+  currentSort = e.target.value;
+  renderApplicationsList();
+});
+
+DOM.filterPills.forEach(pill => {
+  pill.addEventListener("click", () => {
+    DOM.filterPills.forEach(p => p.classList.remove("active"));
+    pill.classList.add("active");
+    activeFilter = pill.getAttribute("data-filter");
+    renderApplicationsList();
+  });
+});
+
+// ==================== ANALYTICS DASHBOARD TAB ====================
+function renderAnalytics() {
+  const total = applications.filter(a => a.status.toLowerCase() !== "wishlist").length;
+  
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  
+  let appsThisMonthCount = 0;
+  let interviewEventsCount = 0;
+  let offerEventsCount = 0;
+  let rejectionEventsCount = 0;
+  
+  const statusCounts = {
+    wishlist: 0,
+    applied: 0,
+    "online assessment": 0,
+    interview: 0,
+    offer: 0,
+    accepted: 0,
+    rejected: 0
+  };
+  
+  applications.forEach(app => {
+    const status = app.status.toLowerCase();
+    if (statusCounts[status] !== undefined) {
+      statusCounts[status]++;
+    }
+    
+    if (app.dateApplied) {
+      const appDate = new Date(app.dateApplied);
+      if (appDate.getFullYear() === currentYear && appDate.getMonth() === currentMonth) {
+        appsThisMonthCount++;
+      }
+    }
+    
+    if (status !== "wishlist") {
+      const history = app.statusHistory || [];
+      const hasInterview = history.some(h => h.status.toLowerCase() === "interview");
+      const hasOffer = history.some(h => h.status.toLowerCase() === "offer" || h.status.toLowerCase() === "accepted");
+      const hasRejection = history.some(h => h.status.toLowerCase() === "rejected");
+      
+      if (hasInterview) interviewEventsCount++;
+      if (hasOffer) offerEventsCount++;
+      if (hasRejection) rejectionEventsCount++;
+    }
+  });
+  
+  DOM.analyticsMonthCount.textContent = appsThisMonthCount;
+  
+  const interviewRate = total > 0 ? Math.round((interviewEventsCount / total) * 100) : 0;
+  const offerRate = total > 0 ? Math.round((offerEventsCount / total) * 100) : 0;
+  const rejectionRate = total > 0 ? Math.round((rejectionEventsCount / total) * 100) : 0;
+  
+  DOM.analyticsInterviewRate.textContent = `${interviewRate}%`;
+  DOM.analyticsOfferRate.textContent = `${offerRate}%`;
+  DOM.analyticsRejectionRate.textContent = `${rejectionRate}%`;
+  
+  DOM.barInterviewRate.style.width = `${interviewRate}%`;
+  DOM.barOfferRate.style.width = `${offerRate}%`;
+  DOM.barRejectionRate.style.width = `${rejectionRate}%`;
+  
+  // Draw Status Distribution Chart list
+  DOM.statusDistributionChart.innerHTML = "";
+  const totalAppsCount = applications.length;
+  
+  Object.keys(statusCounts).forEach(status => {
+    const count = statusCounts[status];
+    const pct = totalAppsCount > 0 ? Math.round((count / totalAppsCount) * 100) : 0;
+    
+    const statusClass = status.replace(" ", "-");
+    let displayStatusLabel = status.toUpperCase();
+    if (displayStatusLabel === "ONLINE ASSESSMENT") displayStatusLabel = "OA";
+    
+    const row = document.createElement("div");
+    row.className = "status-ratio-row";
+    row.innerHTML = `
+      <span class="status-ratio-name">${displayStatusLabel}</span>
+      <div class="status-ratio-bar-wrapper">
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill ${statusClass}" style="width: ${pct}%"></div>
+        </div>
+      </div>
+      <span class="status-ratio-count">${count}</span>
+    `;
+    DOM.statusDistributionChart.appendChild(row);
+  });
+}
+
+// ==================== REMINDERS MODULE LOGIC ====================
+// Toggle reminder creation panel
+DOM.reminderFormToggle.addEventListener("click", () => {
+  const isHidden = DOM.reminderForm.style.display === "none";
+  DOM.reminderForm.style.display = isHidden ? "block" : "none";
+  DOM.reminderFormChevron.className = isHidden ? "fa-solid fa-chevron-up" : "fa-solid fa-chevron-down";
+});
+
+// Populates applications list dropdown select
+function populateReminderAppsDropdown() {
+  DOM.remAppId.innerHTML = '<option value="">-- Select Application --</option>';
+  const activeApps = applications.filter(a => a.status.toLowerCase() !== "wishlist");
+  
+  if (activeApps.length === 0) {
+    DOM.remAppId.innerHTML += `<option value="" disabled>No active applications submitted yet</option>`;
+    return;
+  }
+  
+  activeApps.forEach(app => {
+    DOM.remAppId.innerHTML += `<option value="${app.id}">${escapeHTML(app.company)} - ${escapeHTML(app.role)}</option>`;
+  });
+}
+
+// Set up reminder submission
+DOM.reminderForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  
+  const appId = DOM.remAppId.value;
+  const description = DOM.remTitle.value.trim();
+  const dateStr = DOM.remDate.value;
+  const type = DOM.remType.value;
+  
+  const selectedApp = applications.find(a => a.id === appId);
+  if (!selectedApp) {
+    showToast("Please select a valid job application.", "error");
+    return;
+  }
+  
+  const reminderData = {
+    appId,
+    company: selectedApp.company,
+    role: selectedApp.role,
+    title: description,
+    date: new Date(dateStr).toISOString(),
+    type,
+    completed: false
+  };
+  
+  const submitBtn = DOM.reminderForm.querySelector("button[type='submit']");
+  submitBtn.disabled = true;
+  
+  try {
+    await addReminder(reminderData);
+    showToast("New alert event scheduled!", "success");
+    DOM.reminderForm.reset();
+    DOM.reminderForm.style.display = "none";
+    DOM.reminderFormChevron.className = "fa-solid fa-chevron-down";
+    await loadReminderData();
+  } catch (err) {
+    console.error("Save reminder error:", err);
+    showToast("Failed to schedule reminder.", "error");
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+// Load reminders data
+async function loadReminderData() {
+  try {
+    reminders = await getReminders();
+    renderReminders();
+  } catch (err) {
+    console.error("Failed to load reminders:", err);
+  }
+}
+
+// Render Scheduled Alerts lists
+function renderReminders() {
+  DOM.upcomingRemindersList.innerHTML = "";
+  DOM.completedRemindersList.innerHTML = "";
+  
+  const upcoming = reminders.filter(r => !r.completed);
+  const completed = reminders.filter(r => r.completed);
+  
+  // Render Upcoming
+  if (upcoming.length === 0) {
+    DOM.upcomingRemindersList.innerHTML = `<div style="font-size:0.8rem; text-align:center; color:var(--color-secondary); padding:20px 0;">No reminders yet. Add one to stay on track!</div>`;
+  } else {
+    upcoming.forEach(rem => {
+      const card = buildReminderCard(rem);
+      DOM.upcomingRemindersList.appendChild(card);
+    });
+  }
+  
+  // Render Completed
+  if (completed.length === 0) {
+    DOM.completedRemindersList.innerHTML = `<div style="font-size:0.8rem; text-align:center; color:var(--color-secondary); padding:20px 0;">No completed reminders yet.</div>`;
+  } else {
+    completed.forEach(rem => {
+      const card = buildReminderCard(rem);
+      DOM.completedRemindersList.appendChild(card);
+    });
+  }
+}
+
+// Reminder items DOM layout
+function buildReminderCard(rem) {
+  const card = document.createElement("div");
+  card.className = `reminder-card ${rem.completed ? "completed" : ""}`;
+  
+  const dt = new Date(rem.date);
+  const options = { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" };
+  const formattedDate = dt.toLocaleString("en-US", options);
+  
+  const isOverdue = !rem.completed && dt < new Date();
+  
+  card.innerHTML = `
+    <div class="reminder-checkbox ${rem.completed ? "checked" : ""}">
+      ${rem.completed ? '<i class="fa-solid fa-check"></i>' : ""}
+    </div>
+    
+    <div class="reminder-info">
+      <div class="reminder-title">${escapeHTML(rem.title)}</div>
+      <div class="reminder-meta">
+        <span style="font-weight:600; color:var(--color-accent);">${escapeHTML(rem.company)}</span>
+        <span>•</span>
+        <span style="${isOverdue ? "color:var(--color-rejected); font-weight:600;" : ""}">
+          <i class="fa-regular fa-clock"></i> ${formattedDate} ${isOverdue ? "(Overdue)" : ""}
+        </span>
+        <span>•</span>
+        <span style="background:rgba(255,255,255,0.05); padding:1px 6px; border-radius:4px; font-size:0.6rem;">${rem.type}</span>
+      </div>
+    </div>
+    
+    <button class="reminder-delete-btn" title="Delete Schedule">
+      <i class="fa-regular fa-trash-can"></i>
+    </button>
+  `;
+  
+  // Click checkbox toggles completion
+  card.querySelector(".reminder-checkbox").addEventListener("click", async () => {
+    try {
+      const newStatus = !rem.completed;
+      await updateReminder(rem.id, { completed: newStatus });
+      showToast(newStatus ? "Event marked complete." : "Event set to pending.", "success");
+      await loadReminderData();
+    } catch (err) {
+      console.error("Toggle reminder error:", err);
+    }
+  });
+  
+  // Click Delete button
+  card.querySelector(".reminder-delete-btn").addEventListener("click", async () => {
+    try {
+      await deleteReminder(rem.id);
+      showToast("Reminder deleted.", "info");
+      await loadReminderData();
+    } catch (err) {
+      console.error("Delete reminder error:", err);
+    }
+  });
+  
+  return card;
+}
+
+// ==================== BROWSER NOTIFICATION WORKFLOWS ====================
+async function checkNotificationPermission(request = false) {
+  if (!("Notification" in window)) {
+    DOM.btnRequestNotifications.style.display = "none";
+    return;
+  }
+  
+  if (Notification.permission === "granted") {
+    DOM.btnRequestNotifications.style.display = "none";
+  } else if (Notification.permission === "default" && request) {
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      DOM.btnRequestNotifications.style.display = "none";
+      showToast("Notification alerts enabled successfully!", "success");
+    }
+  } else if (Notification.permission === "denied") {
+    if (request) {
+      showToast("Notifications blocked. Enable in site browser preferences.", "error");
+    }
+  }
+}
+
+DOM.btnRequestNotifications.addEventListener("click", () => {
+  checkNotificationPermission(true);
+});
+
+// Scheduler triggers browser notification popup
+function checkNotificationScheduler() {
+  if (reminders.length === 0) return;
+  const now = new Date();
+  
+  reminders.forEach(async (rem) => {
+    if (!rem.completed) {
+      const remTime = new Date(rem.date);
+      if (remTime <= now && (now - remTime) < 60000) {
+        triggerLocalNotification(rem);
+        
+        rem.completed = true;
+        try {
+          await updateReminder(rem.id, { completed: true });
+          renderReminders();
+        } catch (e) {
+          console.error("Auto update reminder completion error:", e);
+        }
+      }
+    }
+  });
+}
+
+function triggerLocalNotification(rem) {
+  const title = `InternTrack Alert!`;
+  const bodyText = `${rem.company}: ${rem.title} scheduled for today.`;
+  
+  showToast(bodyText, "info");
+  
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(title, {
+      body: bodyText,
+      icon: "https://api.dicebear.com/7.x/bottts/svg?seed=" + encodeURIComponent(rem.company)
+    });
+  }
+}
+
+// Background poll scheduler (Runs checking ticks every 30 seconds)
+setInterval(checkNotificationScheduler, 30000);
+
+// ==================== APP INITIALIZATION ====================
+// App starts immediately — no authentication required
+(async function init() {
+  showView("home-view");
+  await loadApplicationData();
+  await loadReminderData();
+  checkNotificationPermission(false);
+  console.log("InternTrack: Ready — all data stored locally.");
+})();
+
+// ==================== CSV EXPORT ====================
+function exportApplicationsCSV() {
+  if (applications.length === 0) {
+    showToast("No applications to export.", "error");
+    return;
+  }
+  
+  const headers = ["Company Name", "Role", "Status", "Date Applied", "Location", "Application Link", "Recruiter Name", "Recruiter Email", "Notes"];
+  
+  // Escape CSV field: wrap in quotes if it contains commas, quotes, or newlines
+  const escapeCSV = (field) => {
+    if (field == null) return "";
+    const str = String(field);
+    if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+  };
+  
+  const rows = applications.map(app => [
+    escapeCSV(app.company),
+    escapeCSV(app.role),
+    escapeCSV(app.status),
+    escapeCSV(app.dateApplied),
+    escapeCSV(app.location),
+    escapeCSV(app.appLink),
+    escapeCSV(app.recruiterName),
+    escapeCSV(app.recruiterEmail),
+    escapeCSV(app.notes)
+  ].join(","));
+  
+  const csvContent = [headers.join(","), ...rows].join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const fileName = `InternTrack_Export_${new Date().toISOString().split("T")[0]}.csv`;
+  
+  // Try native share first (mobile devices)
+  if (navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: "text/csv" })] })) {
+    const file = new File([blob], fileName, { type: "text/csv" });
+    navigator.share({
+      title: "InternTrack Applications Export",
+      files: [file]
+    }).then(() => {
+      showToast("Export shared successfully!", "success");
+    }).catch((err) => {
+      // User cancelled share — fall back to download
+      if (err.name !== "AbortError") {
+        downloadBlob(blob, fileName);
+      }
+    });
+  } else {
+    // Fallback: direct download
+    downloadBlob(blob, fileName);
+  }
+}
+
+function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  showToast(`Exported ${applications.length} applications as CSV.`, "success");
+}
+
+DOM.btnExportCsv.addEventListener("click", exportApplicationsCSV);
+DOM.btnExportCsvAnalytics.addEventListener("click", exportApplicationsCSV);
+
+// Escape HTML utility
+function escapeHTML(str) {
+  if (!str) return "";
+  const div = document.createElement("div");
+  div.innerText = str;
+  return div.innerHTML;
+}

@@ -1,0 +1,37 @@
+{
+  "name": "interntrack",
+  "version": "1.0.0",
+  "description": "Minimalist internship application tracker — track, manage, and export your job applications",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "dev": "python3 -m http.server 8080",
+    "build": "node scripts/build.js",
+    "cap:sync": "npx cap sync",
+    "cap:android": "npx cap open android",
+    "cap:ios": "npx cap open ios",
+    "cap:build:android": "npm run build && npx cap sync android",
+    "cap:build:ios": "npm run build && npx cap sync ios"
+  },
+  "keywords": [
+    "internship",
+    "tracker",
+    "job-applications",
+    "mobile",
+    "capacitor"
+  ],
+  "author": "InternTrack Team",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/local-notifications": "^6.1.0",
+    "@capacitor/share": "^6.0.0",
+    "@capacitor/splash-screen": "^6.0.0",
+    "@capacitor/status-bar": "^6.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/ios": "^6.2.0"
+  }
+}

@@ -1,0 +1,21 @@
+node_modules/
+www/
+dist/
+
+# Native build artifacts
+android/app/build/
+ios/App/Pods/
+ios/DerivedData/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
