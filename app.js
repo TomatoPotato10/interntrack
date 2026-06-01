@@ -90,6 +90,8 @@ const DOM = {
   cardInterview: document.querySelector(".stat-card.interview"),
   cardOffer: document.querySelector(".stat-card.offer"),
   cardRejected: document.querySelector(".stat-card.rejected"),
+  cardAwaiting: document.querySelector(".stat-card.awaiting-response"),
+  summaryCard: document.querySelector(".summary-card"),
   
   // Reminders View
   btnRequestNotifications: document.getElementById("btn-request-notifications"),
@@ -597,7 +599,7 @@ function renderDashboard() {
     
     recent.forEach(app => {
       if (app) {
-        const card = buildApplicationCard(app, false);
+        const card = buildApplicationCard(app, true);
         DOM.recentAppsList.appendChild(card);
       }
     });
@@ -617,9 +619,15 @@ function renderApplicationsList() {
     
     // 1. Filter pill selector
     if (activeFilter !== "all") {
-      const status = app.status || "Wishlist";
-      if (status.toLowerCase() !== activeFilter.toLowerCase()) {
-        return false;
+      const status = (app.status || "Wishlist").toLowerCase();
+      if (activeFilter === "awaiting") {
+        if (status !== "applied" && status !== "online assessment" && status !== "oa" && status !== "interview") {
+          return false;
+        }
+      } else {
+        if (status !== activeFilter.toLowerCase()) {
+          return false;
+        }
       }
     }
     
@@ -924,6 +932,7 @@ function setApplicationsFilter(filterValue) {
       else if (filterValue === "interview") displayName = "Interviews";
       else if (filterValue === "offer") displayName = "Offers";
       else if (filterValue === "rejected") displayName = "Rejections";
+      else if (filterValue === "awaiting") displayName = "Awaiting Response";
       
       DOM.activeFilterText.innerHTML = `<i class="fa-solid fa-filter" style="margin-right:6px; color:var(--color-accent);"></i> Showing: <strong>${displayName}</strong>`;
       DOM.activeFilterBanner.style.display = "flex";
@@ -966,6 +975,20 @@ if (DOM.cardRejected) {
   DOM.cardRejected.addEventListener("click", () => {
     showView("applications-view");
     setApplicationsFilter("rejected");
+  });
+}
+
+if (DOM.cardAwaiting) {
+  DOM.cardAwaiting.addEventListener("click", () => {
+    showView("applications-view");
+    setApplicationsFilter("awaiting");
+  });
+}
+
+if (DOM.summaryCard) {
+  DOM.summaryCard.addEventListener("click", () => {
+    showView("applications-view");
+    setApplicationsFilter("offer");
   });
 }
 
@@ -1060,6 +1083,12 @@ function renderAnalytics() {
       </div>
       <span class="status-ratio-count">${count}</span>
     `;
+    
+    row.addEventListener("click", () => {
+      showView("applications-view");
+      setApplicationsFilter(status);
+    });
+    
     DOM.statusDistributionChart.appendChild(row);
   });
 }
