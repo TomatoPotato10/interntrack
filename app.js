@@ -12,6 +12,23 @@ import {
   deleteReminder
 } from "./firebase-config.js";
 
+// ==================== CAPACITOR NATIVE NOTIFICATIONS ====================
+// Dynamically import Capacitor LocalNotifications — gracefully falls back
+// to browser APIs when running as a plain web app (non-Capacitor context).
+let LocalNotifications = null;
+let isNativeNotifications = false;
+
+try {
+  const capModule = await import('https://esm.sh/@capacitor/local-notifications@6.1.3');
+  LocalNotifications = capModule.LocalNotifications;
+  // Check if we're actually in a Capacitor native shell
+  const capCoreModule = await import('https://esm.sh/@capacitor/core@6.2.1');
+  isNativeNotifications = capCoreModule.Capacitor.isNativePlatform();
+  console.log(`InternTrack: Capacitor native platform detected: ${isNativeNotifications}`);
+} catch (e) {
+  console.log('InternTrack: Running in browser mode — using web notification fallback.');
+}
+
 // ==================== STATE MANAGEMENT ====================
 let applications = [];
 let reminders = [];
@@ -926,8 +943,10 @@ DOM.reminderForm.addEventListener("submit", async (e) => {
   submitBtn.disabled = true;
   
   try {
-    await addReminder(reminderData);
-    showToast("New alert event scheduled!", "success");
+    const savedReminder = await addReminder(reminderData);
+    // Schedule a real system notification
+    await scheduleSystemNotification(savedReminder);
+    showToast("Reminder scheduled with notification!", "success");
     DOM.reminderForm.reset();
     DOM.reminderForm.style.display = "none";
     DOM.reminderFormChevron.className = "fa-solid fa-chevron-down";
@@ -1018,7 +1037,15 @@ function buildReminderCard(rem) {
     try {
       const newStatus = !rem.completed;
       await updateReminder(rem.id, { completed: newStatus });
-      showToast(newStatus ? "Event marked complete." : "Event set to pending.", "success");
+      if (newStatus) {
+        // Completed — cancel the scheduled notification
+        await cancelSystemNotification(rem.id);
+        showToast("Event marked complete. Notification cancelled.", "success");
+      } else {
+        // Re-opened — reschedule the notification if in future
+        await scheduleSystemNotification(rem);
+        showToast("Event set to pending. Notification rescheduled.", "success");
+      }
       await loadReminderData();
     } catch (err) {
       console.error("Toggle reminder error:", err);
@@ -1028,8 +1055,9 @@ function buildReminderCard(rem) {
   // Click Delete button
   card.querySelector(".reminder-delete-btn").addEventListener("click", async () => {
     try {
+      await cancelSystemNotification(rem.id);
       await deleteReminder(rem.id);
-      showToast("Reminder deleted.", "info");
+      showToast("Reminder and notification deleted.", "info");
       await loadReminderData();
     } catch (err) {
       console.error("Delete reminder error:", err);
@@ -1039,71 +1067,207 @@ function buildReminderCard(rem) {
   return card;
 }
 
-// ==================== BROWSER NOTIFICATION WORKFLOWS ====================
+// ==================== NATIVE NOTIFICATION SYSTEM ====================
+// Uses Capacitor LocalNotifications on native, falls back to browser API on web.
+
+// Generate a stable numeric ID from a reminder string ID for Capacitor
+function reminderIdToNotificationId(remId) {
+  let hash = 0;
+  const str = String(remId);
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash) % 2147483647; // Positive 32-bit int
+}
+
+// Request notification permission (Capacitor native or browser fallback)
 async function checkNotificationPermission(request = false) {
-  if (!("Notification" in window)) {
-    DOM.btnRequestNotifications.style.display = "none";
+  if (isNativeNotifications && LocalNotifications) {
+    try {
+      let permStatus = await LocalNotifications.checkPermissions();
+      if (permStatus.display === 'granted') {
+        DOM.btnRequestNotifications.style.display = "none";
+        return true;
+      }
+      if (request && permStatus.display !== 'denied') {
+        permStatus = await LocalNotifications.requestPermissions();
+        if (permStatus.display === 'granted') {
+          DOM.btnRequestNotifications.style.display = "none";
+          showToast("Notifications enabled! You'll receive alerts for your reminders.", "success");
+          // Reschedule all pending reminders now that we have permission
+          await rescheduleAllReminders();
+          return true;
+        } else {
+          showToast("Notifications permission denied. You can enable it in device Settings.", "error");
+          return false;
+        }
+      }
+      return permStatus.display === 'granted';
+    } catch (e) {
+      console.error('Capacitor notification permission error:', e);
+      return false;
+    }
+  } else {
+    // Browser fallback
+    if (!("Notification" in window)) {
+      DOM.btnRequestNotifications.style.display = "none";
+      return false;
+    }
+    if (Notification.permission === "granted") {
+      DOM.btnRequestNotifications.style.display = "none";
+      return true;
+    }
+    if (request && Notification.permission === "default") {
+      const permission = await Notification.requestPermission();
+      if (permission === "granted") {
+        DOM.btnRequestNotifications.style.display = "none";
+        showToast("Browser notifications enabled!", "success");
+        return true;
+      }
+    }
+    if (request && Notification.permission === "denied") {
+      showToast("Notifications blocked. Enable in browser settings.", "error");
+    }
+    return Notification.permission === "granted";
+  }
+}
+
+// Schedule a system notification for a reminder
+async function scheduleSystemNotification(rem) {
+  if (!rem || rem.completed) return;
+
+  const scheduleTime = new Date(rem.date);
+  // Don't schedule if time is in the past
+  if (scheduleTime <= new Date()) {
+    console.log(`Skipping notification for past reminder: ${rem.id}`);
     return;
   }
-  
-  if (Notification.permission === "granted") {
-    DOM.btnRequestNotifications.style.display = "none";
-  } else if (Notification.permission === "default" && request) {
-    const permission = await Notification.requestPermission();
-    if (permission === "granted") {
-      DOM.btnRequestNotifications.style.display = "none";
-      showToast("Notification alerts enabled successfully!", "success");
+
+  const notifId = reminderIdToNotificationId(rem.id);
+  const title = rem.company || 'InternTrack Reminder';
+  const body = `${rem.type}: ${rem.title}` + (rem.role ? ` — ${rem.role}` : '');
+
+  if (isNativeNotifications && LocalNotifications) {
+    try {
+      // Cancel any existing notification with this ID first
+      await LocalNotifications.cancel({ notifications: [{ id: notifId }] });
+
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: notifId,
+          title: title,
+          body: body,
+          schedule: { at: scheduleTime, allowWhileIdle: true },
+          sound: 'default',
+          smallIcon: 'ic_stat_icon',
+          iconColor: '#6366f1',
+          extra: { reminderId: rem.id }
+        }]
+      });
+      console.log(`Scheduled native notification ${notifId} for ${scheduleTime.toISOString()}`);
+    } catch (e) {
+      console.error('Failed to schedule native notification:', e);
+      // Fallback: at least use the browser polling approach
+      scheduleBrowserFallback(rem);
     }
-  } else if (Notification.permission === "denied") {
-    if (request) {
-      showToast("Notifications blocked. Enable in site browser preferences.", "error");
+  } else {
+    // Browser fallback: use setTimeout if tab stays open
+    scheduleBrowserFallback(rem);
+  }
+}
+
+// Cancel a scheduled system notification
+async function cancelSystemNotification(remId) {
+  const notifId = reminderIdToNotificationId(remId);
+
+  if (isNativeNotifications && LocalNotifications) {
+    try {
+      await LocalNotifications.cancel({ notifications: [{ id: notifId }] });
+      console.log(`Cancelled native notification ${notifId}`);
+    } catch (e) {
+      console.error('Failed to cancel notification:', e);
+    }
+  }
+
+  // Also clear any browser setTimeout
+  if (browserNotificationTimers[remId]) {
+    clearTimeout(browserNotificationTimers[remId]);
+    delete browserNotificationTimers[remId];
+  }
+}
+
+// Reschedule all pending reminders (used after granting permission)
+async function rescheduleAllReminders() {
+  for (const rem of reminders) {
+    if (!rem.completed) {
+      await scheduleSystemNotification(rem);
     }
   }
 }
 
-DOM.btnRequestNotifications.addEventListener("click", () => {
-  checkNotificationPermission(true);
-});
+// Browser fallback: use setTimeout for notifications when tab is open
+const browserNotificationTimers = {};
 
-// Scheduler triggers browser notification popup
-function checkNotificationScheduler() {
-  if (reminders.length === 0) return;
-  const now = new Date();
-  
-  reminders.forEach(async (rem) => {
-    if (!rem.completed) {
-      const remTime = new Date(rem.date);
-      if (remTime <= now && (now - remTime) < 60000) {
-        triggerLocalNotification(rem);
-        
-        rem.completed = true;
-        try {
-          await updateReminder(rem.id, { completed: true });
-          renderReminders();
-        } catch (e) {
-          console.error("Auto update reminder completion error:", e);
-        }
+function scheduleBrowserFallback(rem) {
+  const scheduleTime = new Date(rem.date);
+  const delay = scheduleTime.getTime() - Date.now();
+
+  if (delay <= 0) return;
+
+  // Clear any existing timer for this reminder
+  if (browserNotificationTimers[rem.id]) {
+    clearTimeout(browserNotificationTimers[rem.id]);
+  }
+
+  browserNotificationTimers[rem.id] = setTimeout(async () => {
+    const title = `${rem.company} — InternTrack`;
+    const bodyText = `${rem.type}: ${rem.title}`;
+
+    showToast(bodyText, "info");
+
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(title, {
+        body: bodyText,
+        icon: "https://api.dicebear.com/7.x/bottts/svg?seed=" + encodeURIComponent(rem.company)
+      });
+    }
+
+    // Auto-complete
+    try {
+      await updateReminder(rem.id, { completed: true });
+      await loadReminderData();
+    } catch (e) {
+      console.error('Browser fallback auto-complete error:', e);
+    }
+
+    delete browserNotificationTimers[rem.id];
+  }, delay);
+
+  console.log(`Browser fallback timer set for ${rem.id} in ${Math.round(delay / 1000)}s`);
+}
+
+// Listen for notification action taps (native only)
+if (isNativeNotifications && LocalNotifications) {
+  LocalNotifications.addListener('localNotificationActionPerformed', async (action) => {
+    const remId = action.notification?.extra?.reminderId;
+    if (remId) {
+      // Mark as completed when user taps the notification
+      try {
+        await updateReminder(remId, { completed: true });
+        await loadReminderData();
+        showToast('Reminder completed.', 'success');
+      } catch (e) {
+        console.error('Notification tap handler error:', e);
       }
     }
   });
 }
 
-function triggerLocalNotification(rem) {
-  const title = `InternTrack Alert!`;
-  const bodyText = `${rem.company}: ${rem.title} scheduled for today.`;
-  
-  showToast(bodyText, "info");
-  
-  if ("Notification" in window && Notification.permission === "granted") {
-    new Notification(title, {
-      body: bodyText,
-      icon: "https://api.dicebear.com/7.x/bottts/svg?seed=" + encodeURIComponent(rem.company)
-    });
-  }
-}
-
-// Background poll scheduler (Runs checking ticks every 30 seconds)
-setInterval(checkNotificationScheduler, 30000);
+DOM.btnRequestNotifications.addEventListener("click", () => {
+  checkNotificationPermission(true);
+});
 
 // ==================== APP INITIALIZATION ====================
 // App starts immediately — no authentication required
@@ -1111,7 +1275,21 @@ setInterval(checkNotificationScheduler, 30000);
   showView("home-view");
   await loadApplicationData();
   await loadReminderData();
-  checkNotificationPermission(false);
+  
+  // Request notification permission (non-blocking on first launch)
+  const hasPermission = await checkNotificationPermission(false);
+  
+  // Schedule system notifications for all pending reminders
+  // (ensures notifications survive app restart / device reboot)
+  if (hasPermission) {
+    await rescheduleAllReminders();
+  } else {
+    // Still set up browser fallback timers
+    for (const rem of reminders) {
+      if (!rem.completed) scheduleBrowserFallback(rem);
+    }
+  }
+  
   console.log("InternTrack: Ready — all data stored locally.");
 })();
 
