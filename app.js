@@ -423,8 +423,10 @@ DOM.appForm.addEventListener("submit", async (e) => {
     }
     
     closeDrawer();
-    await loadApplicationData();
-    await loadReminderData(); // Refresh selection drops
+    await Promise.all([
+      loadApplicationData(true),
+      loadReminderData(true)
+    ]);
   } catch (err) {
     console.error("Save application error:", err);
     showToast("Error updating database.", "error");
@@ -435,6 +437,19 @@ DOM.appForm.addEventListener("submit", async (e) => {
 });
 
 // Loading State Renderers for Skeleton/Spinners
+function showRecentAppsLoadingState() {
+  if (DOM.recentAppsList) {
+    DOM.recentAppsList.innerHTML = `
+      <div class="skeleton-container" style="padding: 10px 0;">
+        <div class="skeleton-card" style="height: 70px; margin-bottom: 8px;">
+          <div class="skeleton-header-line" style="width: 50%;"></div>
+          <div class="skeleton-sub-line" style="width: 30%;"></div>
+        </div>
+      </div>
+    `;
+  }
+}
+
 function showApplicationsLoadingState() {
   if (DOM.appsList) {
     DOM.appsList.innerHTML = `
@@ -493,11 +508,13 @@ function showRemindersErrorState() {
 }
 
 // Load application items
-async function loadApplicationData() {
+async function loadApplicationData(simulateDelay = false) {
   try {
     showApplicationsLoadingState();
-    // Simulate brief database latency for smooth visual transitions
-    await new Promise(resolve => setTimeout(resolve, 500));
+    if (simulateDelay) {
+      // Simulate brief database latency for smooth visual transitions
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
     applications = await getApplications() || [];
     renderDashboard();
     renderApplicationsList();
@@ -511,8 +528,15 @@ async function loadApplicationData() {
 
 // ==================== RENDERING COMPONENT BUILDERS ====================
 
-// 1. Render Dashboard/Home Stats
+// 1. Render Dashboard/Home Stats (Split for non-blocking browser paints)
 function renderDashboard() {
+  renderDashboardSummary();
+  requestAnimationFrame(() => {
+    renderDashboardRecent();
+  });
+}
+
+function renderDashboardSummary() {
   const stats = {
     wishlist: 0,
     applied: 0,
@@ -580,6 +604,10 @@ function renderDashboard() {
       DOM.summaryMessage.textContent = `${stats.submitted} applications submitted. Build a daily habit of finding roles.`;
     }
   }
+}
+
+function renderDashboardRecent() {
+  const appsArray = Array.isArray(applications) ? applications : [];
   
   // Recent applications list render
   if (DOM.recentAppsList) {
@@ -848,20 +876,64 @@ function showApplicationDetails(appId) {
   }
   
   // Notes
-  DOM.detailsNotesText.textContent = app.notes || "No notes logged for this job.";
+  DOM.detailsNotesText.value = app.notes || "";
   
   // Activate overlay screen
   DOM.detailsOverlay.classList.add("active");
 }
 
-DOM.detailsCloseBtn.addEventListener("click", () => {
+// Save details notes to database
+async function saveDetailsNotes() {
+  if (currentSelectedAppId) {
+    const app = applications.find(a => a.id === currentSelectedAppId);
+    if (app) {
+      const updatedNotes = DOM.detailsNotesText.value;
+      if (app.notes !== updatedNotes) {
+        app.notes = updatedNotes;
+        try {
+          await updateApplication(app.id, { notes: updatedNotes });
+          renderApplicationsList();
+          renderDashboardRecent();
+        } catch (err) {
+          console.error("Failed to save details notes:", err);
+        }
+      }
+    }
+  }
+}
+
+// Notes events inside Details Overlay
+DOM.detailsNotesText.addEventListener("input", (e) => {
+  if (currentSelectedAppId) {
+    const app = applications.find(a => a.id === currentSelectedAppId);
+    if (app) {
+      app.notes = e.target.value;
+    }
+  }
+});
+
+DOM.detailsNotesText.addEventListener("blur", () => {
+  saveDetailsNotes();
+});
+
+DOM.detailsOverlay.addEventListener("click", (e) => {
+  if (e.target === DOM.detailsOverlay) {
+    saveDetailsNotes();
+    DOM.detailsOverlay.classList.remove("active");
+    currentSelectedAppId = null;
+  }
+});
+
+DOM.detailsCloseBtn.addEventListener("click", async () => {
+  await saveDetailsNotes();
   DOM.detailsOverlay.classList.remove("active");
   currentSelectedAppId = null;
 });
 
 // Edit from details view
-DOM.btnDetailsEdit.addEventListener("click", () => {
+DOM.btnDetailsEdit.addEventListener("click", async () => {
   if (currentSelectedAppId) {
+    await saveDetailsNotes();
     const appObj = applications.find(a => a.id === currentSelectedAppId);
     openDrawer(true, appObj);
   }
@@ -879,8 +951,10 @@ DOM.btnDetailsDelete.addEventListener("click", async () => {
         await deleteApplication(app.id);
         showToast(`Deleted ${app.company} tracker records.`, "info");
         DOM.detailsOverlay.classList.remove("active");
-        await loadApplicationData();
-        await loadReminderData();
+        await Promise.all([
+          loadApplicationData(true),
+          loadReminderData(true)
+        ]);
       } catch (err) {
         console.error("Delete error:", err);
         showToast("Deletion failed.", "error");
@@ -1152,7 +1226,7 @@ DOM.reminderForm.addEventListener("submit", async (e) => {
     DOM.reminderForm.reset();
     DOM.reminderForm.style.display = "none";
     DOM.reminderFormChevron.className = "fa-solid fa-chevron-down";
-    await loadReminderData();
+    await loadReminderData(true);
   } catch (err) {
     console.error("Save reminder error:", err);
     showToast("Failed to schedule reminder.", "error");
@@ -1162,11 +1236,13 @@ DOM.reminderForm.addEventListener("submit", async (e) => {
 });
 
 // Load reminders data
-async function loadReminderData() {
+async function loadReminderData(simulateDelay = false) {
   try {
     showRemindersLoadingState();
-    // Simulate brief database latency for smooth transitions
-    await new Promise(resolve => setTimeout(resolve, 400));
+    if (simulateDelay) {
+      // Simulate brief database latency for smooth transitions
+      await new Promise(resolve => setTimeout(resolve, 400));
+    }
     reminders = await getReminders() || [];
     renderReminders();
   } catch (err) {
@@ -1267,7 +1343,7 @@ function buildReminderCard(rem) {
         await scheduleSystemNotification(rem);
         showToast("Event set to pending. Notification rescheduled.", "success");
       }
-      await loadReminderData();
+      await loadReminderData(true);
     } catch (err) {
       console.error("Toggle reminder error:", err);
     }
@@ -1279,7 +1355,7 @@ function buildReminderCard(rem) {
       await cancelSystemNotification(rem.id);
       await deleteReminder(rem.id);
       showToast("Reminder and notification deleted.", "info");
-      await loadReminderData();
+      await loadReminderData(true);
     } catch (err) {
       console.error("Delete reminder error:", err);
     }
@@ -1491,11 +1567,64 @@ DOM.btnRequestNotifications.addEventListener("click", () => {
 });
 
 // ==================== APP INITIALIZATION ====================
+// Setup notifications at startup
+async function setupStartupNotifications() {
+  try {
+    const hasPermission = await checkNotificationPermission(false);
+    if (hasPermission) {
+      await rescheduleAllReminders();
+    } else {
+      for (const rem of reminders) {
+        if (!rem.completed) scheduleBrowserFallback(rem);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to setup startup notifications:", err);
+  }
+}
+
 // App starts immediately — no authentication required
 (async function init() {
   showView("home-view");
-  await loadApplicationData();
-  await loadReminderData();
+  
+  // Instantly paint loading skeletons for dashboard sections to improve visual transition
+  showRecentAppsLoadingState();
+  showApplicationsLoadingState();
+  showRemindersLoadingState();
+  
+  // Progressively fetch data in the background without blocking the initial view render
+  setTimeout(async () => {
+    try {
+      const [appsData, remindersData] = await Promise.all([
+        getApplications() || [],
+        getReminders() || []
+      ]);
+      
+      applications = appsData;
+      reminders = remindersData;
+      
+      // Stage 1: Render metrics/counters and drop-down lists immediately
+      renderDashboardSummary();
+      populateReminderAppsDropdown();
+      
+      // Stage 2: Render recent applications and full applications lists in the next frame
+      requestAnimationFrame(() => {
+        renderDashboardRecent();
+        renderApplicationsList();
+      });
+      
+      // Stage 3: Render reminders list in the next frame
+      requestAnimationFrame(() => {
+        renderReminders();
+        setupStartupNotifications();
+      });
+      
+    } catch (err) {
+      console.error("Async startup data load failed:", err);
+      showApplicationsErrorState();
+      showRemindersErrorState();
+    }
+  }, 0);
   
   // Support filtering via URL status parameter/hash on startup
   const urlParams = new URLSearchParams(window.location.search);
@@ -1510,21 +1639,7 @@ DOM.btnRequestNotifications.addEventListener("click", () => {
     }
   }
   
-  // Request notification permission (non-blocking on first launch)
-  const hasPermission = await checkNotificationPermission(false);
-  
-  // Schedule system notifications for all pending reminders
-  // (ensures notifications survive app restart / device reboot)
-  if (hasPermission) {
-    await rescheduleAllReminders();
-  } else {
-    // Still set up browser fallback timers
-    for (const rem of reminders) {
-      if (!rem.completed) scheduleBrowserFallback(rem);
-    }
-  }
-  
-  console.log("InternTrack: Ready — all data stored locally.");
+  console.log("InternTrack: Ready — background loading active.");
 })();
 
 

@@ -1102,10 +1102,30 @@ body.light-mode .filter-pill {
   font-size: 0.82rem;
   line-height: 1.5;
   color: var(--color-secondary);
-  white-space: pre-wrap;
   border: 1px solid var(--border-glass);
+  width: 100%;
+  resize: vertical;
+  min-height: 120px;
   max-height: 200px;
-  overflow-y: auto;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+body.light-mode .details-notes-content {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(15, 23, 42, 0.12);
+  color: var(--color-secondary);
+}
+
+.details-notes-content:focus {
+  border-color: var(--color-accent);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+body.light-mode .details-notes-content:focus {
+  background: white;
 }
 
 .details-footer {
@@ -1792,6 +1812,9 @@ body.light-mode .filter-pill {
   background: rgba(255, 255, 255, 0.03);
   padding-left: 10px;
 }
+
+
+
 
 
 
