@@ -83,6 +83,13 @@ const DOM = {
   filterPills: document.querySelectorAll(".filter-pill"),
   appsList: document.getElementById("apps-list"),
   fabAddApp: document.getElementById("fab-add-app"),
+  activeFilterBanner: document.getElementById("active-filter-banner"),
+  activeFilterText: document.getElementById("active-filter-text"),
+  btnClearFilter: document.getElementById("btn-clear-filter"),
+  cardApplied: document.querySelector(".stat-card.applied"),
+  cardInterview: document.querySelector(".stat-card.interview"),
+  cardOffer: document.querySelector(".stat-card.offer"),
+  cardRejected: document.querySelector(".stat-card.rejected"),
   
   // Reminders View
   btnRequestNotifications: document.getElementById("btn-request-notifications"),
@@ -885,14 +892,88 @@ DOM.appSort.addEventListener("change", (e) => {
   renderApplicationsList();
 });
 
+function setApplicationsFilter(filterValue) {
+  activeFilter = filterValue;
+  
+  // Update UI active filter pills
+  DOM.filterPills.forEach(pill => {
+    if (pill.getAttribute("data-filter") === filterValue) {
+      pill.classList.add("active");
+    } else {
+      pill.classList.remove("active");
+    }
+  });
+  
+  // Update URL parameters without reload
+  const url = new URL(window.location.href);
+  if (filterValue === "all") {
+    url.searchParams.delete('status');
+  } else {
+    url.searchParams.set('status', filterValue);
+  }
+  window.history.replaceState({}, '', url.pathname + url.search);
+  
+  // Update active filter banner
+  if (DOM.activeFilterBanner && DOM.activeFilterText) {
+    if (filterValue === "all") {
+      DOM.activeFilterBanner.style.display = "none";
+    } else {
+      let displayName = filterValue.charAt(0).toUpperCase() + filterValue.slice(1);
+      if (filterValue === "online assessment") displayName = "OA";
+      else if (filterValue === "applied") displayName = "Submitted";
+      else if (filterValue === "interview") displayName = "Interviews";
+      else if (filterValue === "offer") displayName = "Offers";
+      else if (filterValue === "rejected") displayName = "Rejections";
+      
+      DOM.activeFilterText.innerHTML = `<i class="fa-solid fa-filter" style="margin-right:6px; color:var(--color-accent);"></i> Showing: <strong>${displayName}</strong>`;
+      DOM.activeFilterBanner.style.display = "flex";
+    }
+  }
+  
+  renderApplicationsList();
+}
+
 DOM.filterPills.forEach(pill => {
   pill.addEventListener("click", () => {
-    DOM.filterPills.forEach(p => p.classList.remove("active"));
-    pill.classList.add("active");
-    activeFilter = pill.getAttribute("data-filter");
-    renderApplicationsList();
+    const filter = pill.getAttribute("data-filter");
+    setApplicationsFilter(filter);
   });
 });
+
+// Interactive Dashboard Stats Cards Clicks
+if (DOM.cardApplied) {
+  DOM.cardApplied.addEventListener("click", () => {
+    showView("applications-view");
+    setApplicationsFilter("applied");
+  });
+}
+
+if (DOM.cardInterview) {
+  DOM.cardInterview.addEventListener("click", () => {
+    showView("applications-view");
+    setApplicationsFilter("interview");
+  });
+}
+
+if (DOM.cardOffer) {
+  DOM.cardOffer.addEventListener("click", () => {
+    showView("applications-view");
+    setApplicationsFilter("offer");
+  });
+}
+
+if (DOM.cardRejected) {
+  DOM.cardRejected.addEventListener("click", () => {
+    showView("applications-view");
+    setApplicationsFilter("rejected");
+  });
+}
+
+if (DOM.btnClearFilter) {
+  DOM.btnClearFilter.addEventListener("click", () => {
+    setApplicationsFilter("all");
+  });
+}
 
 // ==================== ANALYTICS DASHBOARD TAB ====================
 function renderAnalytics() {
@@ -1386,6 +1467,19 @@ DOM.btnRequestNotifications.addEventListener("click", () => {
   showView("home-view");
   await loadApplicationData();
   await loadReminderData();
+  
+  // Support filtering via URL status parameter/hash on startup
+  const urlParams = new URLSearchParams(window.location.search);
+  let statusParam = urlParams.get('status') || window.location.hash.replace('#', '');
+  if (statusParam) {
+    statusParam = statusParam.toLowerCase();
+    const validFilters = ["wishlist", "applied", "online assessment", "oa", "interview", "offer", "accepted", "rejected"];
+    if (validFilters.includes(statusParam)) {
+      if (statusParam === "oa") statusParam = "online assessment";
+      showView("applications-view");
+      setApplicationsFilter(statusParam);
+    }
+  }
   
   // Request notification permission (non-blocking on first launch)
   const hasPermission = await checkNotificationPermission(false);

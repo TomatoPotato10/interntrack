@@ -1704,3 +1704,61 @@ body.light-mode .filter-pill {
   width: 85%;
 }
 
+/* ==================== STATS CARDS HOVER EFFECTS ==================== */
+.stat-card.applied,
+.stat-card.interview,
+.stat-card.offer,
+.stat-card.rejected {
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s ease;
+}
+
+.stat-card.applied:hover,
+.stat-card.interview:hover,
+.stat-card.offer:hover,
+.stat-card.rejected:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.stat-card.applied:active,
+.stat-card.interview:active,
+.stat-card.offer:active,
+.stat-card.rejected:active {
+  transform: translateY(-1px);
+}
+
+/* ==================== ACTIVE FILTER BANNER ==================== */
+.active-filter-banner {
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  color: var(--color-primary);
+  animation: cardFadeIn 0.3s ease-out;
+}
+
+.btn-clear-filter {
+  background: transparent;
+  border: none;
+  color: var(--color-accent);
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 0.2s ease;
+  font-size: 0.8rem;
+}
+
+.btn-clear-filter:hover {
+  opacity: 0.8;
+}
+
+
