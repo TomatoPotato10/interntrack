@@ -96,10 +96,8 @@ const DOM = {
   upcomingRemindersList: document.getElementById("upcoming-reminders-list"),
   completedRemindersList: document.getElementById("completed-reminders-list"),
   
-  // Theme Toggle & Export
+  // Theme Toggle
   btnToggleTheme: document.getElementById("btn-toggle-theme"),
-  btnExportCsv: document.getElementById("btn-export-csv"),
-  btnExportCsvAnalytics: document.getElementById("btn-export-csv-analytics"),
   
   // Application Details Overlay Card
   detailsOverlay: document.getElementById("details-overlay"),
@@ -1293,75 +1291,6 @@ DOM.btnRequestNotifications.addEventListener("click", () => {
   console.log("InternTrack: Ready — all data stored locally.");
 })();
 
-// ==================== CSV EXPORT ====================
-function exportApplicationsCSV() {
-  if (applications.length === 0) {
-    showToast("No applications to export.", "error");
-    return;
-  }
-  
-  const headers = ["Company Name", "Role", "Status", "Date Applied", "Location", "Application Link", "Recruiter Name", "Recruiter Email", "Notes"];
-  
-  // Escape CSV field: wrap in quotes if it contains commas, quotes, or newlines
-  const escapeCSV = (field) => {
-    if (field == null) return "";
-    const str = String(field);
-    if (str.includes('"') || str.includes(',') || str.includes('\n') || str.includes('\r')) {
-      return '"' + str.replace(/"/g, '""') + '"';
-    }
-    return str;
-  };
-  
-  const rows = applications.map(app => [
-    escapeCSV(app.company),
-    escapeCSV(app.role),
-    escapeCSV(app.status),
-    escapeCSV(app.dateApplied),
-    escapeCSV(app.location),
-    escapeCSV(app.appLink),
-    escapeCSV(app.recruiterName),
-    escapeCSV(app.recruiterEmail),
-    escapeCSV(app.notes)
-  ].join(","));
-  
-  const csvContent = [headers.join(","), ...rows].join("\n");
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-  const fileName = `InternTrack_Export_${new Date().toISOString().split("T")[0]}.csv`;
-  
-  // Try native share first (mobile devices)
-  if (navigator.canShare && navigator.canShare({ files: [new File([blob], fileName, { type: "text/csv" })] })) {
-    const file = new File([blob], fileName, { type: "text/csv" });
-    navigator.share({
-      title: "InternTrack Applications Export",
-      files: [file]
-    }).then(() => {
-      showToast("Export shared successfully!", "success");
-    }).catch((err) => {
-      // User cancelled share — fall back to download
-      if (err.name !== "AbortError") {
-        downloadBlob(blob, fileName);
-      }
-    });
-  } else {
-    // Fallback: direct download
-    downloadBlob(blob, fileName);
-  }
-}
-
-function downloadBlob(blob, fileName) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-  showToast(`Exported ${applications.length} applications as CSV.`, "success");
-}
-
-DOM.btnExportCsv.addEventListener("click", exportApplicationsCSV);
-DOM.btnExportCsvAnalytics.addEventListener("click", exportApplicationsCSV);
 
 // Escape HTML utility
 function escapeHTML(str) {
