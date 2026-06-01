@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InternTrack — Device Preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #0a0a0f;
+      color: #e2e8f0;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: #111118;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      height: 56px;
+      gap: 12px;
+    }
+
+    .toolbar-brand {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #a78bfa;
+      white-space: nowrap;
+    }
+
+    .device-buttons {
+      display: flex;
+      gap: 4px;
+      flex-wrap: nowrap;
+    }
+
+    .device-btn {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #94a3b8;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      font-family: 'Inter', sans-serif;
+      font-weight: 500;
+      transition: all 0.2s;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .device-btn:hover {
+      background: rgba(167, 139, 250, 0.1);
+      border-color: rgba(167, 139, 250, 0.3);
+      color: #c4b5fd;
+    }
+
+    .device-btn.active {
+      background: rgba(167, 139, 250, 0.15);
+      border-color: #a78bfa;
+      color: #e2e8f0;
+    }
+
+    .device-btn .icon { font-size: 1rem; }
+
+    .toolbar-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .size-label {
+      font-size: 0.72rem;
+      color: #64748b;
+      font-weight: 500;
+      background: rgba(255,255,255,0.04);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-variant-numeric: tabular-nums;
+      min-width: 100px;
+      text-align: center;
+    }
+
+    .rotate-btn {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #94a3b8;
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .rotate-btn:hover {
+      background: rgba(167, 139, 250, 0.1);
+      color: #c4b5fd;
+    }
+
+    .preview-area {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: calc(100vh - 56px);
+      background: #0a0a0f;
+      padding: 20px;
+    }
+
+    .device-frame {
+      position: relative;
+      background: #1a1a24;
+      border-radius: 32px;
+      padding: 12px;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.06),
+        0 20px 60px rgba(0,0,0,0.5),
+        0 0 80px rgba(167, 139, 250, 0.04);
+      transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                  height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+    }
+
+    .device-frame::before {
+      content: '';
+      position: absolute;
+      top: 6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 4px;
+      background: #2a2a36;
+      border-radius: 4px;
+      z-index: 10;
+    }
+
+    .device-frame.no-notch::before {
+      display: none;
+    }
+
+    .device-frame iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      border-radius: 20px;
+      background: #fff;
+    }
+
+    /* Responsive layout for toolbar on small screens */
+    @media (max-width: 768px) {
+      .toolbar { padding: 8px 12px; flex-wrap: wrap; height: auto; }
+      .device-buttons { overflow-x: auto; width: 100%; }
+      .preview-area { padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <span class="toolbar-brand">📱 InternTrack Preview</span>
+    
+    <div class="device-buttons">
+      <button class="device-btn active" data-w="375" data-h="812" data-label="iPhone SE/13 mini">
+        <span class="icon">📱</span> Small Mobile
+      </button>
+      <button class="device-btn" data-w="430" data-h="932" data-label="iPhone 15 Pro Max">
+        <span class="icon">📱</span> Large Mobile
+      </button>
+      <button class="device-btn" data-w="393" data-h="852" data-label="Pixel 8">
+        <span class="icon">🤖</span> Android
+      </button>
+      <button class="device-btn" data-w="768" data-h="1024" data-label="iPad Mini">
+        <span class="icon">📋</span> Tablet
+      </button>
+      <button class="device-btn" data-w="1024" data-h="768" data-label="iPad Landscape" data-nonotch="true">
+        <span class="icon">🖥️</span> Tablet Landscape
+      </button>
+      <button class="device-btn" data-w="1440" data-h="900" data-label="Desktop" data-nonotch="true">
+        <span class="icon">💻</span> Desktop
+      </button>
+    </div>
+
+    <div class="toolbar-info">
+      <span class="size-label" id="size-label">375 × 812</span>
+      <button class="rotate-btn" id="rotate-btn" title="Rotate device">🔄</button>
+    </div>
+  </div>
+
+  <div class="preview-area">
+    <div class="device-frame" id="device-frame">
+      <iframe src="/index.html" id="preview-iframe"></iframe>
+    </div>
+  </div>
+
+  <script>
+    const frame = document.getElementById('device-frame');
+    const iframe = document.getElementById('preview-iframe');
+    const sizeLabel = document.getElementById('size-label');
+    const buttons = document.querySelectorAll('.device-btn');
+    const rotateBtn = document.getElementById('rotate-btn');
+    
+    let currentW = 375;
+    let currentH = 812;
+    let isRotated = false;
+
+    function setDevice(w, h, noNotch = false) {
+      currentW = w;
+      currentH = h;
+      isRotated = false;
+      
+      // Calculate max dimensions to fit in viewport
+      const maxH = window.innerHeight - 56 - 40; // toolbar + padding
+      const maxW = window.innerWidth - 40;
+      
+      let displayW = w;
+      let displayH = h;
+      
+      // Scale down if needed
+      if (displayH > maxH) {
+        const scale = maxH / displayH;
+        displayW = Math.round(displayW * scale);
+        displayH = Math.round(displayH * scale);
+      }
+      if (displayW > maxW) {
+        const scale = maxW / displayW;
+        displayW = Math.round(displayW * scale);
+        displayH = Math.round(displayH * scale);
+      }
+
+      frame.style.width = (displayW + 24) + 'px';
+      frame.style.height = (displayH + 24) + 'px';
+      
+      if (noNotch) {
+        frame.classList.add('no-notch');
+      } else {
+        frame.classList.remove('no-notch');
+      }
+      
+      sizeLabel.textContent = `${w} × ${h}`;
+      
+      // Reload iframe to re-trigger responsive styles
+      iframe.src = iframe.src;
+    }
+
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const w = parseInt(btn.dataset.w);
+        const h = parseInt(btn.dataset.h);
+        const noNotch = btn.dataset.nonotch === 'true';
+        setDevice(w, h, noNotch);
+      });
+    });
+
+    rotateBtn.addEventListener('click', () => {
+      isRotated = !isRotated;
+      const w = isRotated ? currentH : currentW;
+      const h = isRotated ? currentW : currentH;
+      setDevice(w, h, currentW > 768);
+      // Swap stored values back so next rotate works
+      if (isRotated) {
+        const tmp = currentW;
+        currentW = currentH;
+        currentH = tmp;
+        isRotated = true;
+      }
+    });
+
+    // Initial size
+    setDevice(375, 812);
+  </script>
+</body>
+</html>

@@ -120,8 +120,6 @@ body {
   color: var(--color-primary);
   min-height: 100vh;
   display: flex;
-  justify-content: center;
-  align-items: center;
   overflow: hidden;
   background-image: var(--bg-mesh);
   background-attachment: fixed;
@@ -132,25 +130,13 @@ body {
 #app-shell {
   width: 100%;
   height: 100vh;
-  max-width: 480px;
   background: rgba(11, 17, 32, 0.85);
-  border-left: 1px solid var(--border-glass);
-  border-right: 1px solid var(--border-glass);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
   backdrop-filter: blur(20px);
   transition: background 0.3s ease;
-}
-
-@media (min-width: 481px) {
-  #app-shell {
-    height: 92vh;
-    border-radius: 40px;
-    border: 1.5px solid var(--border-glass);
-  }
 }
 
 /* Scrollbar Customization */
@@ -390,6 +376,12 @@ body.light-mode .btn-secondary:hover {
   gap: 12px;
   margin-bottom: 24px;
 }
+
+/* Responsive content wrapper for centered max-width on large screens */
+.view {
+  padding: 20px 16px 20px 16px;
+}
+
 
 .stat-card {
   background: var(--bg-card);
@@ -705,8 +697,8 @@ body.light-mode .filter-pill {
 
 /* Application Card Layout */
 .apps-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
@@ -1347,4 +1339,297 @@ body.light-mode .filter-pill {
   opacity: 0;
   transform: translateY(-20px);
   transition: var(--transition-smooth);
+}
+
+/* ==================== RESPONSIVE BREAKPOINTS ==================== */
+
+/* ---------- Tablet (768px+) ---------- */
+@media (min-width: 768px) {
+  .view {
+    padding: 28px 32px;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .apps-list {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .search-filter-wrapper {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .search-input-wrapper {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .sort-select {
+    min-width: 180px;
+  }
+
+  .filter-pills {
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .summary-card {
+    padding: 24px;
+    gap: 28px;
+  }
+
+  .summary-chart-container {
+    width: 100px;
+    height: 100px;
+  }
+
+  .status-selector-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .drawer {
+    max-width: 600px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100%);
+    border-radius: 28px 28px 0 0;
+  }
+
+  .drawer.active {
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .details-pane {
+    width: 50%;
+    min-width: 400px;
+  }
+
+  .analytics-card {
+    padding: 24px;
+  }
+
+  .home-tab-switcher {
+    max-width: 300px;
+  }
+
+  .stat-number {
+    font-size: 2.2rem;
+  }
+
+  .stat-label {
+    font-size: 0.85rem;
+  }
+
+  .app-company-name {
+    font-size: 1.2rem;
+  }
+
+  #toast-container {
+    max-width: 500px;
+  }
+
+  .fab {
+    bottom: 90px;
+    right: 32px;
+    width: 64px;
+    height: 64px;
+    border-radius: 32px;
+    font-size: 1.6rem;
+  }
+
+  /* Recent apps section on dashboard — 2 columns */
+  .recent-apps-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+}
+
+/* ---------- Desktop (1024px+) ---------- */
+@media (min-width: 1024px) {
+  body {
+    align-items: stretch;
+  }
+
+  .view {
+    padding: 32px 48px;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 18px;
+  }
+
+  .apps-list {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+  }
+
+  .section-header {
+    margin-bottom: 28px;
+  }
+
+  .user-welcome-name {
+    font-size: 1.5rem;
+  }
+
+  .user-welcome-sub {
+    font-size: 0.88rem;
+  }
+
+  /* Dashboard overview: side-by-side layout */
+  #home-overview-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .summary-card {
+    padding: 28px;
+    gap: 32px;
+  }
+
+  .summary-chart-container {
+    width: 120px;
+    height: 120px;
+  }
+
+  .drawer {
+    max-width: 640px;
+    padding: 32px;
+    border-radius: 28px 28px 0 0;
+  }
+
+  .details-pane {
+    width: 420px;
+    padding: 32px 28px;
+  }
+
+  /* Bottom nav becomes a horizontal bar */
+  #bottom-nav {
+    max-width: 400px;
+    margin: 0 auto;
+    border-radius: 20px 20px 0 0;
+  }
+
+  .nav-tab {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .nav-tab span {
+    font-size: 0.8rem;
+  }
+
+  .analytics-card {
+    padding: 28px;
+  }
+
+  .metric-meter-group {
+    max-width: 600px;
+  }
+
+  /* Form inputs get more breathing room */
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    padding: 14px;
+    font-size: 0.95rem;
+  }
+
+  .stat-card {
+    padding: 20px;
+    min-height: 120px;
+  }
+
+  .stat-number {
+    font-size: 2.4rem;
+  }
+
+  .app-card {
+    padding: 20px;
+  }
+
+  .fab {
+    bottom: 40px;
+    right: 48px;
+  }
+
+  #toast-container {
+    left: auto;
+    right: 32px;
+    top: 32px;
+    transform: none;
+  }
+}
+
+/* ---------- Large Desktop (1440px+) ---------- */
+@media (min-width: 1440px) {
+  .view {
+    padding: 40px 64px;
+    max-width: 1440px;
+  }
+
+  .stats-grid {
+    gap: 20px;
+  }
+
+  .apps-list {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .recent-apps-list {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .drawer {
+    max-width: 720px;
+  }
+
+  .details-pane {
+    width: 480px;
+  }
+
+  .summary-card {
+    max-width: 600px;
+  }
+}
+
+/* ---------- Landscape phones ---------- */
+@media (max-height: 500px) and (orientation: landscape) {
+  .stats-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+  }
+
+  .stat-card {
+    min-height: 80px;
+    padding: 12px;
+  }
+
+  .stat-number {
+    font-size: 1.4rem;
+  }
+
+  .fab {
+    bottom: 16px;
+    right: 16px;
+    width: 48px;
+    height: 48px;
+    font-size: 1.2rem;
+  }
+
+  #bottom-nav {
+    padding: 4px 0;
+  }
 }
