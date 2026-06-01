@@ -562,7 +562,7 @@ function renderDashboard() {
   // Dynamic summary descriptions
   if (DOM.summaryHeadline && DOM.summaryMessage) {
     if (stats.submitted === 0) {
-      DOM.summaryHeadline.textContent = "Pipeline Empty";
+      DOM.summaryHeadline.textContent = "No Applications Yet";
       DOM.summaryMessage.textContent = "You haven't logged any applications yet. Tap the + button to add your first one!";
     } else if (stats.accepted > 0) {
       DOM.summaryHeadline.textContent = "Congratulations! 🏆";

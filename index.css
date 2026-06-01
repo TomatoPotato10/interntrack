@@ -1,5 +1,5 @@
 /* index.css */
-/* Premium CRM Design System for InternTrack */
+/* Premium Design System for InternTrack */
 
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
@@ -24,7 +24,7 @@
   --color-accent-glow: rgba(99, 102, 241, 0.3);
   --color-accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
   
-  /* Extended CRM Status Colors */
+  /* Extended Status Colors */
   --color-wishlist: #a78bfa;
   --color-wishlist-bg: rgba(167, 139, 250, 0.1);
   
