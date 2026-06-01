@@ -425,16 +425,78 @@ DOM.appForm.addEventListener("submit", async (e) => {
   }
 });
 
+// Loading State Renderers for Skeleton/Spinners
+function showApplicationsLoadingState() {
+  if (DOM.appsList) {
+    DOM.appsList.innerHTML = `
+      <div class="skeleton-container">
+        <div class="skeleton-card">
+          <div class="skeleton-header-line"></div>
+          <div class="skeleton-sub-line"></div>
+          <div class="skeleton-text-line"></div>
+        </div>
+        <div class="skeleton-card">
+          <div class="skeleton-header-line"></div>
+          <div class="skeleton-sub-line"></div>
+          <div class="skeleton-text-line"></div>
+        </div>
+        <div class="skeleton-card">
+          <div class="skeleton-header-line"></div>
+          <div class="skeleton-sub-line"></div>
+          <div class="skeleton-text-line"></div>
+        </div>
+      </div>
+    `;
+  }
+}
+
+function showApplicationsErrorState() {
+  if (DOM.appsList) {
+    DOM.appsList.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon" style="color:var(--color-rejected);"><i class="fa-solid fa-circle-exclamation"></i></div>
+        <h3>Failed to load applications</h3>
+        <p>There was an error querying the local database storage.</p>
+      </div>
+    `;
+  }
+}
+
+function showRemindersLoadingState() {
+  if (DOM.upcomingRemindersList) {
+    DOM.upcomingRemindersList.innerHTML = `
+      <div class="loading-spinner-wrapper">
+        <div class="loading-spinner"></div>
+        <div style="font-size:0.8rem; color:var(--color-secondary);">Loading reminders...</div>
+      </div>
+    `;
+  }
+}
+
+function showRemindersErrorState() {
+  if (DOM.upcomingRemindersList) {
+    DOM.upcomingRemindersList.innerHTML = `
+      <div style="font-size:0.8rem; text-align:center; color:var(--color-rejected); padding:20px 0;">
+        <i class="fa-solid fa-circle-exclamation" style="margin-right:6px;"></i> Failed to load reminders.
+      </div>
+    `;
+  }
+}
+
 // Load application items
 async function loadApplicationData() {
   try {
-    applications = await getApplications();
+    showApplicationsLoadingState();
+    // Simulate brief database latency for smooth visual transitions
+    await new Promise(resolve => setTimeout(resolve, 500));
+    applications = await getApplications() || [];
     renderDashboard();
     renderApplicationsList();
     populateReminderAppsDropdown();
   } catch (err) {
     console.error("Failed to load application data:", err);
     showToast("Failed to fetch database.", "error");
+    showApplicationsErrorState();
   }
 }
 
@@ -454,15 +516,18 @@ function renderDashboard() {
     awaiting: 0   // awaiting = Applied + OA + Interview
   };
   
-  applications.forEach(app => {
-    const status = app.status.toLowerCase();
+  const appsArray = Array.isArray(applications) ? applications : [];
+  
+  appsArray.forEach(app => {
+    if (!app) return;
+    const status = (app.status || "Wishlist").toLowerCase();
     
     if (status === "wishlist") stats.wishlist++;
     else {
       stats.submitted++;
       
       if (status === "applied") { stats.applied++; stats.awaiting++; }
-      else if (status === "online assessment") { stats.oa++; stats.awaiting++; }
+      else if (status === "online assessment" || status === "oa") { stats.oa++; stats.awaiting++; }
       else if (status === "interview") { stats.interview++; stats.awaiting++; }
       else if (status === "offer") stats.offer++;
       else if (status === "accepted") stats.accepted++;
@@ -471,68 +536,82 @@ function renderDashboard() {
   });
   
   // Set UI stats numbers
-  DOM.statsApplied.textContent = stats.submitted;
-  DOM.statsInterview.textContent = stats.interview;
-  DOM.statsOffer.textContent = stats.offer + stats.accepted;
-  DOM.statsRejected.textContent = stats.rejected;
-  DOM.statsAwaiting.textContent = stats.awaiting;
+  if (DOM.statsApplied) DOM.statsApplied.textContent = stats.submitted;
+  if (DOM.statsInterview) DOM.statsInterview.textContent = stats.interview;
+  if (DOM.statsOffer) DOM.statsOffer.textContent = stats.offer + stats.accepted;
+  if (DOM.statsRejected) DOM.statsRejected.textContent = stats.rejected;
+  if (DOM.statsAwaiting) DOM.statsAwaiting.textContent = stats.awaiting;
   
   // Conversion Ring (Offer + Accepted / Total Submitted)
   const offerRate = stats.submitted > 0 ? Math.round(((stats.offer + stats.accepted) / stats.submitted) * 100) : 0;
-  DOM.successRatePct.textContent = `${offerRate}%`;
+  if (DOM.successRatePct) DOM.successRatePct.textContent = `${offerRate}%`;
   
-  const strokeDash = 201; // Circumference
-  const offset = strokeDash - (offerRate / 100) * strokeDash;
-  DOM.summaryCircle.style.strokeDashoffset = offset;
+  if (DOM.summaryCircle) {
+    const strokeDash = 201; // Circumference
+    const offset = strokeDash - (offerRate / 100) * strokeDash;
+    DOM.summaryCircle.style.strokeDashoffset = offset;
+  }
   
   // Dynamic summary descriptions
-  if (stats.submitted === 0) {
-    DOM.summaryHeadline.textContent = "Pipeline Empty";
-    DOM.summaryMessage.textContent = "You haven't logged any applications yet. Tap the + button to add your first one!";
-  } else if (stats.accepted > 0) {
-    DOM.summaryHeadline.textContent = "Congratulations! 🏆";
-    DOM.summaryMessage.textContent = `You have accepted an offer! All your hard work has paid off.`;
-  } else if (stats.offer > 0) {
-    DOM.summaryHeadline.textContent = "Offers Secured! 🎉";
-    DOM.summaryMessage.textContent = `You have ${stats.offer} active offer(s) waiting. Prepare your negotiation plans!`;
-  } else if (stats.interview > 0) {
-    DOM.summaryHeadline.textContent = "Active Interviewing 🚀";
-    DOM.summaryMessage.textContent = `You have ${stats.interview} interview cycles scheduled. Prepare thoroughly!`;
-  } else {
-    DOM.summaryHeadline.textContent = "Keep Submitting!";
-    DOM.summaryMessage.textContent = `${stats.submitted} applications submitted. Build a daily habit of finding roles.`;
+  if (DOM.summaryHeadline && DOM.summaryMessage) {
+    if (stats.submitted === 0) {
+      DOM.summaryHeadline.textContent = "Pipeline Empty";
+      DOM.summaryMessage.textContent = "You haven't logged any applications yet. Tap the + button to add your first one!";
+    } else if (stats.accepted > 0) {
+      DOM.summaryHeadline.textContent = "Congratulations! 🏆";
+      DOM.summaryMessage.textContent = `You have accepted an offer! All your hard work has paid off.`;
+    } else if (stats.offer > 0) {
+      DOM.summaryHeadline.textContent = "Offers Secured! 🎉";
+      DOM.summaryMessage.textContent = `You have ${stats.offer} active offer(s) waiting. Prepare your negotiation plans!`;
+    } else if (stats.interview > 0) {
+      DOM.summaryHeadline.textContent = "Active Interviewing 🚀";
+      DOM.summaryMessage.textContent = `You have ${stats.interview} interview cycles scheduled. Prepare thoroughly!`;
+    } else {
+      DOM.summaryHeadline.textContent = "Keep Submitting!";
+      DOM.summaryMessage.textContent = `${stats.submitted} applications submitted. Build a daily habit of finding roles.`;
+    }
   }
   
   // Recent applications list render
-  DOM.recentAppsList.innerHTML = "";
-  // Sort applications by dateApplied descending to find recent
-  const sortedByDate = [...applications].sort((a,b) => new Date(b.dateApplied || 0) - new Date(a.dateApplied || 0));
-  const recent = sortedByDate.slice(0, 3);
-  
-  if (recent.length === 0) {
-    DOM.recentAppsList.innerHTML = `
-      <div class="empty-state" style="padding: 20px 10px;">
-        <p>No recent activity. Click the + button to add one.</p>
-      </div>
-    `;
-    return;
+  if (DOM.recentAppsList) {
+    DOM.recentAppsList.innerHTML = "";
+    // Sort applications by dateApplied descending to find recent
+    const sortedByDate = [...appsArray].sort((a,b) => new Date(b.dateApplied || 0) - new Date(a.dateApplied || 0));
+    const recent = sortedByDate.slice(0, 3);
+    
+    if (recent.length === 0) {
+      DOM.recentAppsList.innerHTML = `
+        <div class="empty-state" style="padding: 20px 10px;">
+          <p>No recent activity. Click the + button to add one.</p>
+        </div>
+      `;
+      return;
+    }
+    
+    recent.forEach(app => {
+      if (app) {
+        const card = buildApplicationCard(app, false);
+        DOM.recentAppsList.appendChild(card);
+      }
+    });
   }
-  
-  recent.forEach(app => {
-    const card = buildApplicationCard(app, false);
-    DOM.recentAppsList.appendChild(card);
-  });
 }
 
 // 2. Render Applications Screen (Catalog with search, filter, and sort)
 function renderApplicationsList() {
+  if (!DOM.appsList) return;
   DOM.appsList.innerHTML = "";
   
+  const appsArray = Array.isArray(applications) ? applications : [];
+  
   // Filter list
-  let filtered = applications.filter(app => {
+  let filtered = appsArray.filter(app => {
+    if (!app) return false;
+    
     // 1. Filter pill selector
     if (activeFilter !== "all") {
-      if (app.status.toLowerCase() !== activeFilter.toLowerCase()) {
+      const status = app.status || "Wishlist";
+      if (status.toLowerCase() !== activeFilter.toLowerCase()) {
         return false;
       }
     }
@@ -540,10 +619,13 @@ function renderApplicationsList() {
     // 2. Search query match
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
+      const company = (app.company || "").toLowerCase();
+      const role = (app.role || "").toLowerCase();
+      const location = (app.location || "").toLowerCase();
       return (
-        app.company.toLowerCase().includes(q) ||
-        app.role.toLowerCase().includes(q) ||
-        (app.location && app.location.toLowerCase().includes(q))
+        company.includes(q) ||
+        role.includes(q) ||
+        location.includes(q)
       );
     }
     return true;
@@ -551,23 +633,26 @@ function renderApplicationsList() {
   
   // Sort list
   filtered.sort((a, b) => {
+    if (!a || !b) return 0;
     if (currentSort === "date-desc") {
       return new Date(b.dateApplied || 0) - new Date(a.dateApplied || 0);
     } else if (currentSort === "date-asc") {
       return new Date(a.dateApplied || 0) - new Date(b.dateApplied || 0);
     } else if (currentSort === "company-asc") {
-      return a.company.localeCompare(b.company);
+      return (a.company || "").localeCompare(b.company || "");
     } else if (currentSort === "company-desc") {
-      return b.company.localeCompare(a.company);
+      return (b.company || "").localeCompare(a.company || "");
     }
     return 0;
   });
   
-  DOM.appsCountSub.textContent = `${filtered.length} applications matches found`;
+  if (DOM.appsCountSub) {
+    DOM.appsCountSub.textContent = `${filtered.length} applications matches found`;
+  }
   
   if (filtered.length === 0) {
     let msg = "No items matched your catalog filter criteria.";
-    if (applications.length === 0) {
+    if (appsArray.length === 0) {
       msg = "You haven't logged any applications yet. Start by adding one!";
     }
     
@@ -576,7 +661,7 @@ function renderApplicationsList() {
         <div class="empty-state-icon"><i class="fa-regular fa-folder-open"></i></div>
         <h3>No applications logged</h3>
         <p>${msg}</p>
-        ${applications.length === 0 ? `<button class="btn btn-secondary" id="catalog-empty-add" style="width:auto; padding:10px 20px;">Create First Application</button>` : ""}
+        ${appsArray.length === 0 ? `<button class="btn btn-secondary" id="catalog-empty-add" style="width:auto; padding:10px 20px;">Create First Application</button>` : ""}
       </div>
     `;
     
@@ -586,15 +671,20 @@ function renderApplicationsList() {
   }
   
   filtered.forEach(app => {
-    const card = buildApplicationCard(app, true);
-    DOM.appsList.appendChild(card);
+    if (app) {
+      const card = buildApplicationCard(app, true);
+      DOM.appsList.appendChild(card);
+    }
   });
 }
 
 // 3. Application Card builder
 function buildApplicationCard(app, bindClick = true) {
+  if (!app) return document.createElement("div");
   const card = document.createElement("div");
-  const statusClass = app.status.toLowerCase().replace(" ", "-");
+  
+  const status = app.status || "Wishlist";
+  const statusClass = status.toLowerCase().replace(" ", "-");
   card.className = `app-card ${statusClass}`;
   
   if (bindClick) {
@@ -608,18 +698,22 @@ function buildApplicationCard(app, bindClick = true) {
   let dateStr = "Wishlist (No date)";
   if (app.dateApplied) {
     const options = { month: "short", day: "numeric", year: "numeric" };
-    dateStr = new Date(app.dateApplied).toLocaleDateString("en-US", options);
+    try {
+      dateStr = new Date(app.dateApplied).toLocaleDateString("en-US", options);
+    } catch (e) {
+      dateStr = "Invalid Date";
+    }
   }
   
   // Custom display tag
-  let displayStatus = app.status;
+  let displayStatus = status;
   if (displayStatus === "Online Assessment") displayStatus = "OA";
   
   card.innerHTML = `
     <div class="app-card-header">
       <div>
-        <h4 class="app-company-name">${escapeHTML(app.company)}</h4>
-        <div class="app-role">${escapeHTML(app.role)}</div>
+        <h4 class="app-company-name">${escapeHTML(app.company || "Unknown")}</h4>
+        <div class="app-role">${escapeHTML(app.role || "Unknown")}</div>
       </div>
       <span class="status-badge ${statusClass}">${displayStatus}</span>
     </div>
@@ -960,28 +1054,37 @@ DOM.reminderForm.addEventListener("submit", async (e) => {
 // Load reminders data
 async function loadReminderData() {
   try {
-    reminders = await getReminders();
+    showRemindersLoadingState();
+    // Simulate brief database latency for smooth transitions
+    await new Promise(resolve => setTimeout(resolve, 400));
+    reminders = await getReminders() || [];
     renderReminders();
   } catch (err) {
     console.error("Failed to load reminders:", err);
+    showRemindersErrorState();
   }
 }
 
 // Render Scheduled Alerts lists
 function renderReminders() {
+  if (!DOM.upcomingRemindersList || !DOM.completedRemindersList) return;
   DOM.upcomingRemindersList.innerHTML = "";
   DOM.completedRemindersList.innerHTML = "";
   
-  const upcoming = reminders.filter(r => !r.completed);
-  const completed = reminders.filter(r => r.completed);
+  const remindersArray = Array.isArray(reminders) ? reminders : [];
+  
+  const upcoming = remindersArray.filter(r => r && !r.completed);
+  const completed = remindersArray.filter(r => r && r.completed);
   
   // Render Upcoming
   if (upcoming.length === 0) {
     DOM.upcomingRemindersList.innerHTML = `<div style="font-size:0.8rem; text-align:center; color:var(--color-secondary); padding:20px 0;">No reminders yet. Add one to stay on track!</div>`;
   } else {
     upcoming.forEach(rem => {
-      const card = buildReminderCard(rem);
-      DOM.upcomingRemindersList.appendChild(card);
+      if (rem) {
+        const card = buildReminderCard(rem);
+        DOM.upcomingRemindersList.appendChild(card);
+      }
     });
   }
   
@@ -990,22 +1093,32 @@ function renderReminders() {
     DOM.completedRemindersList.innerHTML = `<div style="font-size:0.8rem; text-align:center; color:var(--color-secondary); padding:20px 0;">No completed reminders yet.</div>`;
   } else {
     completed.forEach(rem => {
-      const card = buildReminderCard(rem);
-      DOM.completedRemindersList.appendChild(card);
+      if (rem) {
+        const card = buildReminderCard(rem);
+        DOM.completedRemindersList.appendChild(card);
+      }
     });
   }
 }
 
 // Reminder items DOM layout
 function buildReminderCard(rem) {
+  if (!rem) return document.createElement("div");
   const card = document.createElement("div");
   card.className = `reminder-card ${rem.completed ? "completed" : ""}`;
   
-  const dt = new Date(rem.date);
-  const options = { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" };
-  const formattedDate = dt.toLocaleString("en-US", options);
-  
-  const isOverdue = !rem.completed && dt < new Date();
+  let formattedDate = "No date";
+  let isOverdue = false;
+  if (rem.date) {
+    try {
+      const dt = new Date(rem.date);
+      const options = { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" };
+      formattedDate = dt.toLocaleString("en-US", options);
+      isOverdue = !rem.completed && dt < new Date();
+    } catch (e) {
+      formattedDate = "Invalid Date";
+    }
+  }
   
   card.innerHTML = `
     <div class="reminder-checkbox ${rem.completed ? "checked" : ""}">
@@ -1013,15 +1126,15 @@ function buildReminderCard(rem) {
     </div>
     
     <div class="reminder-info">
-      <div class="reminder-title">${escapeHTML(rem.title)}</div>
+      <div class="reminder-title">${escapeHTML(rem.title || "No Title")}</div>
       <div class="reminder-meta">
-        <span style="font-weight:600; color:var(--color-accent);">${escapeHTML(rem.company)}</span>
+        <span style="font-weight:600; color:var(--color-accent);">${escapeHTML(rem.company || "General")}</span>
         <span>•</span>
         <span style="${isOverdue ? "color:var(--color-rejected); font-weight:600;" : ""}">
           <i class="fa-regular fa-clock"></i> ${formattedDate} ${isOverdue ? "(Overdue)" : ""}
         </span>
         <span>•</span>
-        <span style="background:rgba(255,255,255,0.05); padding:1px 6px; border-radius:4px; font-size:0.6rem;">${rem.type}</span>
+        <span style="background:rgba(255,255,255,0.05); padding:1px 6px; border-radius:4px; font-size:0.6rem;">${escapeHTML(rem.type || "Reminder")}</span>
       </div>
     </div>
     
