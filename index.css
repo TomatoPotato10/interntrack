@@ -1520,6 +1520,7 @@ body.light-mode .details-notes-content:focus {
   /* Bottom nav becomes a horizontal bar */
   #bottom-nav {
     max-width: 400px;
+    right: 0;
     margin: 0 auto;
     border-radius: 20px 20px 0 0;
   }
