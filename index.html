@@ -160,7 +160,7 @@
         </div>
         
         <!-- Applications submission this month and distribution -->
-        <div class="analytics-card" style="margin-top: 16px;">
+        <div class="analytics-card">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
             <h4 style="margin:0;">Activity Metrics</h4>
             <span style="font-size:0.78rem; background:rgba(99,102,241,0.12); color:var(--color-accent); padding:2px 8px; border-radius:6px; font-weight:600;">
@@ -250,58 +250,64 @@
         </button>
       </div>
       
-      <!-- Reminder Creation Panel -->
-      <div class="analytics-card" style="margin-bottom: 20px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" id="reminder-form-toggle">
-          <h4 style="margin:0; font-size: 0.95rem;"><i class="fa-regular fa-clock" style="margin-right:6px; color:var(--color-accent);"></i> Schedule Event Reminder</h4>
-          <i class="fa-solid fa-chevron-down" id="reminder-form-chevron"></i>
-        </div>
-        
-        <form id="reminder-form" style="display: none; margin-top: 16px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
-          <div class="form-group">
-            <label for="rem-app-id">Select Application</label>
-            <select id="rem-app-id" class="form-input" style="padding-left:16px;" required>
-              <!-- Populated dynamically -->
-            </select>
+      <!-- Reminders Content Grid Layout -->
+      <div class="reminders-content-layout">
+        <!-- Reminder Creation Panel -->
+        <div class="analytics-card" style="margin-bottom: 0;">
+          <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer;" id="reminder-form-toggle">
+            <h4 style="margin:0; font-size: 0.95rem;"><i class="fa-regular fa-clock" style="margin-right:6px; color:var(--color-accent);"></i> Schedule Event Reminder</h4>
+            <i class="fa-solid fa-chevron-down" id="reminder-form-chevron"></i>
           </div>
           
-          <div class="form-group">
-            <label for="rem-title">Reminder Description</label>
-            <div class="form-input-wrapper">
-              <i class="fa-solid fa-circle-info"></i>
-              <input type="text" id="rem-title" class="form-input" placeholder="e.g. Coding Test or Technical Prep" required>
-            </div>
-          </div>
-          
-          <div class="form-group" style="display:flex; gap:12px;">
-            <div style="flex:1;">
-              <label for="rem-date">Date & Time</label>
-              <input type="datetime-local" id="rem-date" class="form-input" style="padding-left:16px;" required>
-            </div>
-            <div style="width: 120px;">
-              <label for="rem-type">Type</label>
-              <select id="rem-type" class="form-input" style="padding-left:16px;" required>
-                <option value="Interview">Interview</option>
-                <option value="Deadline">Deadline</option>
+          <form id="reminder-form" style="display: none; margin-top: 16px; border-top: 1px solid var(--border-glass); padding-top: 16px;">
+            <div class="form-group">
+              <label for="rem-app-id">Select Application</label>
+              <select id="rem-app-id" class="form-input" style="padding-left:16px;" required>
+                <!-- Populated dynamically -->
               </select>
             </div>
+            
+            <div class="form-group">
+              <label for="rem-title">Reminder Description</label>
+              <div class="form-input-wrapper">
+                <i class="fa-solid fa-circle-info"></i>
+                <input type="text" id="rem-title" class="form-input" placeholder="e.g. Coding Test or Technical Prep" required>
+              </div>
+            </div>
+            
+            <div class="form-row">
+              <div style="flex:1; width:100%;">
+                <label for="rem-date">Date & Time</label>
+                <input type="datetime-local" id="rem-date" class="form-input" style="padding-left:16px;" required>
+              </div>
+              <div class="form-row-fixed-col">
+                <label for="rem-type">Type</label>
+                <select id="rem-type" class="form-input" style="padding-left:16px;" required>
+                  <option value="Interview">Interview</option>
+                  <option value="Deadline">Deadline</option>
+                </select>
+              </div>
+            </div>
+            
+            <button type="submit" class="btn" style="padding:10px; font-size:0.9rem; width:100%;">
+              <i class="fa-solid fa-calendar-plus"></i> Set Schedule Alert
+            </button>
+          </form>
+        </div>
+        
+        <!-- Reminders Lists -->
+        <div class="reminders-lists-col">
+          <!-- Reminders Sections -->
+          <h3 style="font-size:1rem; margin-bottom:12px;"><i class="fa-regular fa-bell" style="margin-right:6px; color:var(--color-interview);"></i> Upcoming Reminders</h3>
+          <div id="upcoming-reminders-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:24px;">
+            <!-- Upcoming alerts -->
           </div>
           
-          <button type="submit" class="btn" style="padding:10px; font-size:0.9rem;">
-            <i class="fa-solid fa-calendar-plus"></i> Set Schedule Alert
-          </button>
-        </form>
-      </div>
-      
-      <!-- Reminders Sections -->
-      <h3 style="font-size:1rem; margin-bottom:12px;"><i class="fa-regular fa-bell" style="margin-right:6px; color:var(--color-interview);"></i> Upcoming Reminders</h3>
-      <div id="upcoming-reminders-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:24px;">
-        <!-- Upcoming alerts -->
-      </div>
-      
-      <h3 style="font-size:1rem; margin-bottom:12px; color:var(--color-secondary);"><i class="fa-regular fa-circle-check" style="margin-right:6px;"></i> Completed Events</h3>
-      <div id="completed-reminders-list" style="display:flex; flex-direction:column; gap:10px; opacity: 0.6;">
-        <!-- Completed list -->
+          <h3 style="font-size:1rem; margin-bottom:12px; color:var(--color-secondary);"><i class="fa-regular fa-circle-check" style="margin-right:6px;"></i> Completed Events</h3>
+          <div id="completed-reminders-list" style="display:flex; flex-direction:column; gap:10px; opacity: 0.6;">
+            <!-- Completed list -->
+          </div>
+        </div>
       </div>
     </div>
     
@@ -465,7 +471,7 @@
           </div>
         </div>
 
-        <div class="form-group" style="display: flex; gap: 12px; margin-bottom: 16px;">
+        <div class="form-row">
           <div style="flex: 1;">
             <label for="app-recruiter-name">Recruiter Name (Optional)</label>
             <div class="form-input-wrapper">
