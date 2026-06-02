@@ -1246,7 +1246,7 @@ body.light-mode .details-notes-content:focus {
 
 /* Fixed Bottom Navigation (3 Tabs) - Floating Pill Dock */
 #bottom-nav {
-  position: absolute;
+  position: fixed;
   bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
@@ -1539,6 +1539,13 @@ body.light-mode .details-notes-content:focus {
     max-width: 1200px;
     margin: 0 auto;
     width: 100%;
+  }
+
+  #bottom-nav {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 16px;
   }
 
   .stats-grid {
