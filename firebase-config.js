@@ -46,8 +46,13 @@ const STORAGE_KEY_REMINDERS = "interntrack_reminders";
 // ---- APPLICATIONS CRUD ----
 
 export async function getApplications() {
-  const appsStr = localStorage.getItem(STORAGE_KEY_APPS) || "[]";
-  return JSON.parse(appsStr);
+  try {
+    const appsStr = localStorage.getItem(STORAGE_KEY_APPS) || "[]";
+    return JSON.parse(appsStr);
+  } catch (e) {
+    console.error("Failed to parse applications from storage:", e);
+    return [];
+  }
 }
 
 export async function addApplication(appData) {
@@ -92,9 +97,14 @@ export async function deleteApplication(appId) {
 // ---- REMINDERS CRUD ----
 
 export async function getReminders() {
-  const remsStr = localStorage.getItem(STORAGE_KEY_REMINDERS) || "[]";
-  let reminders = JSON.parse(remsStr);
-  return reminders.sort((a, b) => new Date(a.date) - new Date(b.date));
+  try {
+    const remsStr = localStorage.getItem(STORAGE_KEY_REMINDERS) || "[]";
+    let reminders = JSON.parse(remsStr);
+    return reminders.sort((a, b) => new Date(a.date) - new Date(b.date));
+  } catch (e) {
+    console.error("Failed to parse reminders from storage:", e);
+    return [];
+  }
 }
 
 export async function addReminder(reminderData) {

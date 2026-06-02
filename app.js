@@ -296,8 +296,11 @@ function openDrawer(isEdit = false, appObj = null) {
     DOM.appInterviewType.value = "";
     DOM.appInterviewNotes.value = "";
     
-    const today = new Date().toISOString().split("T")[0];
-    DOM.appDate.value = today;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    DOM.appDate.value = `${year}-${month}-${day}`;
     selectStatusButton("Applied");
   }
 }
@@ -320,16 +323,18 @@ DOM.appStatusSelector.querySelectorAll(".status-select-btn").forEach(btn => {
 });
 
 function selectStatusButton(status) {
-  selectedFormStatus = status;
+  let normalized = status;
+  if (status && status.toLowerCase() === "oa") normalized = "Online Assessment";
+  selectedFormStatus = normalized;
   DOM.appStatusSelector.querySelectorAll(".status-select-btn").forEach(btn => {
     btn.classList.remove("active");
-    if (btn.getAttribute("data-status").toLowerCase() === status.toLowerCase()) {
+    if (btn.getAttribute("data-status").toLowerCase() === normalized.toLowerCase()) {
       btn.classList.add("active");
     }
   });
   
   // Toggle interview group view conditionally in form
-  if (status.toLowerCase() === "interview") {
+  if (normalized.toLowerCase() === "interview") {
     DOM.formInterviewGroup.style.display = "block";
   } else {
     DOM.formInterviewGroup.style.display = "none";
@@ -344,7 +349,10 @@ DOM.appForm.addEventListener("submit", async (e) => {
   const company = DOM.appCompany.value.trim();
   const role = DOM.appRole.value.trim();
   const location = DOM.appLocation.value.trim();
-  const appUrl = DOM.appLink.value.trim();
+  let appUrl = DOM.appLink.value.trim();
+  if (appUrl && !/^https?:\/\//i.test(appUrl)) {
+    appUrl = "https://" + appUrl;
+  }
   const dateApplied = DOM.appDate.value;
   const notes = DOM.appNotes.value.trim();
   const recruiterName = DOM.appRecruiterName.value.trim();
@@ -647,9 +655,11 @@ function renderApplicationsList() {
     
     // 1. Filter pill selector
     if (activeFilter !== "all") {
-      const status = (app.status || "Wishlist").toLowerCase();
+      let status = (app.status || "Wishlist").toLowerCase();
+      if (status === "oa") status = "online assessment";
+      
       if (activeFilter === "awaiting") {
-        if (status !== "applied" && status !== "online assessment" && status !== "oa" && status !== "interview") {
+        if (status !== "applied" && status !== "online assessment" && status !== "interview") {
           return false;
         }
       } else {
@@ -727,7 +737,8 @@ function buildApplicationCard(app, bindClick = true) {
   const card = document.createElement("div");
   
   const status = app.status || "Wishlist";
-  const statusClass = status.toLowerCase().replace(" ", "-");
+  let normalizedStatus = status.toLowerCase() === "oa" ? "Online Assessment" : status;
+  const statusClass = normalizedStatus.toLowerCase().replace(" ", "-");
   card.className = `app-card ${statusClass}`;
   
   if (bindClick) {
@@ -749,7 +760,7 @@ function buildApplicationCard(app, bindClick = true) {
   }
   
   // Custom display tag
-  let displayStatus = status;
+  let displayStatus = normalizedStatus;
   if (displayStatus === "Online Assessment") displayStatus = "OA";
   
   card.innerHTML = `
@@ -792,9 +803,11 @@ function showApplicationDetails(appId) {
   DOM.detailsLocationText.textContent = app.location || "Remote / Unknown";
   
   // Status Badge Class
-  const statusClass = app.status.toLowerCase().replace(" ", "-");
+  let normalizedStatus = app.status;
+  if (normalizedStatus.toLowerCase() === "oa") normalizedStatus = "Online Assessment";
+  const statusClass = normalizedStatus.toLowerCase().replace(" ", "-");
   DOM.detailsStatusBadge.className = `status-badge ${statusClass}`;
-  DOM.detailsStatusBadge.textContent = app.status;
+  DOM.detailsStatusBadge.textContent = normalizedStatus === "Online Assessment" ? "OA" : normalizedStatus;
   
   // Date format
   if (app.dateApplied) {
@@ -825,7 +838,8 @@ function showApplicationDetails(appId) {
   } else {
     history.forEach(hist => {
       const node = document.createElement("div");
-      const histClass = hist.status.toLowerCase().replace(" ", "-");
+      const status = hist.status.toLowerCase() === "oa" ? "Online Assessment" : hist.status;
+      const histClass = status.toLowerCase().replace(" ", "-");
       node.className = `timeline-node ${histClass}`;
       
       const options = { month: "short", day: "numeric", year: "numeric" };
@@ -835,7 +849,7 @@ function showApplicationDetails(appId) {
         <div class="timeline-node-bullet"></div>
         <div class="timeline-node-box">
           <div class="timeline-node-header">
-            <span>Status: ${hist.status}</span>
+            <span>Status: ${status === "Online Assessment" ? "OA" : status}</span>
           </div>
           <div class="timeline-node-date">Updated on ${formattedDate}</div>
         </div>
@@ -1096,7 +1110,9 @@ function renderAnalytics() {
   };
   
   applications.forEach(app => {
-    const status = app.status.toLowerCase();
+    let status = app.status.toLowerCase();
+    if (status === "oa") status = "online assessment";
+    
     if (statusCounts[status] !== undefined) {
       statusCounts[status]++;
     }
