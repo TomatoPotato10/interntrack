@@ -1202,20 +1202,25 @@ body.light-mode .details-notes-content:focus {
 
 
 
-/* Fixed Bottom Navigation (3 Tabs) */
+/* Fixed Bottom Navigation (3 Tabs) - Floating Pill Dock */
 #bottom-nav {
   position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 76px;
-  background: rgba(17, 24, 39, 0.8);
-  border-top: 1px solid var(--border-glass);
-  backdrop-filter: blur(12px);
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 380px;
+  height: 64px;
+  background: rgba(17, 24, 39, 0.85);
+  border: 1px solid var(--border-glass);
+  border-radius: 32px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
   display: flex;
   justify-content: space-around;
   align-items: center;
   z-index: 20;
+  transition: var(--transition-smooth);
 }
 
 .nav-tab {
@@ -1515,14 +1520,6 @@ body.light-mode .details-notes-content:focus {
   .details-pane {
     width: 420px;
     padding: 32px 28px;
-  }
-
-  /* Bottom nav becomes a horizontal bar */
-  #bottom-nav {
-    max-width: 400px;
-    right: 0;
-    margin: 0 auto;
-    border-radius: 20px 20px 0 0;
   }
 
   .nav-tab {
