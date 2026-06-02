@@ -1235,10 +1235,74 @@ DOM.reminderForm.addEventListener("submit", async (e) => {
   submitBtn.disabled = true;
   
   try {
+    // Intercept creation to verify notification permission status
+    let hasPermission = false;
+    
+    if (isNativeNotifications && LocalNotifications) {
+      const permStatus = await LocalNotifications.checkPermissions();
+      if (permStatus.display === 'granted') {
+        hasPermission = true;
+      } else if (permStatus.display === 'denied') {
+        showToast("Notifications blocked. Reminders won't alert you unless enabled in device Settings.", "error");
+        hasPermission = false;
+      } else {
+        // Status is prompt/default - display explanation rationale first
+        const userApproved = await showNotificationRationale();
+        if (userApproved) {
+          const requestStatus = await LocalNotifications.requestPermissions();
+          if (requestStatus.display === 'granted') {
+            hasPermission = true;
+            DOM.btnRequestNotifications.style.display = "none";
+            showToast("Notifications enabled successfully!", "success");
+          } else {
+            showToast("Notification permission denied. Reminders cannot deliver alerts.", "error");
+            hasPermission = false;
+          }
+        } else {
+          showToast("Notification permission postponed. Reminders cannot deliver alerts.", "error");
+          hasPermission = false;
+        }
+      }
+    } else {
+      // Browser fallback permission check
+      if (!("Notification" in window)) {
+        hasPermission = false;
+      } else if (Notification.permission === "granted") {
+        hasPermission = true;
+      } else if (Notification.permission === "denied") {
+        showToast("Notifications blocked. Enable in browser settings to receive alerts.", "error");
+        hasPermission = false;
+      } else {
+        // Status is default/prompt - display explanation rationale first
+        const userApproved = await showNotificationRationale();
+        if (userApproved) {
+          const permission = await Notification.requestPermission();
+          if (permission === "granted") {
+            hasPermission = true;
+            DOM.btnRequestNotifications.style.display = "none";
+            showToast("Notifications enabled successfully!", "success");
+          } else {
+            showToast("Notification permission denied. Reminders cannot deliver alerts.", "error");
+            hasPermission = false;
+          }
+        } else {
+          showToast("Notification permission postponed. Reminders cannot deliver alerts.", "error");
+          hasPermission = false;
+        }
+      }
+    }
+
     const savedReminder = await addReminder(reminderData);
-    // Schedule a real system notification
-    await scheduleSystemNotification(savedReminder);
-    showToast("Reminder scheduled with notification!", "success");
+    
+    // Save is successful. Schedule the notification if permission is active
+    if (hasPermission) {
+      await scheduleSystemNotification(savedReminder);
+      showToast("Reminder scheduled with notification!", "success");
+    } else {
+      scheduleBrowserFallback(savedReminder);
+      showToast("Reminder saved. Alerts are disabled.", "info");
+    }
+    
     DOM.reminderForm.reset();
     DOM.reminderForm.style.display = "none";
     DOM.reminderFormChevron.className = "fa-solid fa-chevron-down";
@@ -1396,6 +1460,37 @@ function reminderIdToNotificationId(remId) {
 }
 
 // Request notification permission (Capacitor native or browser fallback)
+// Show rationale modal to explain notification permission usage
+function showNotificationRationale() {
+  return new Promise((resolve) => {
+    const modal = document.getElementById("notif-rationale-modal");
+    const confirmBtn = document.getElementById("btn-notif-confirm");
+    const cancelBtn = document.getElementById("btn-notif-cancel");
+    
+    modal.style.display = "flex";
+    
+    const handleConfirm = () => {
+      cleanup();
+      resolve(true);
+    };
+    
+    const handleCancel = () => {
+      cleanup();
+      resolve(false);
+    };
+    
+    const cleanup = () => {
+      modal.style.display = "none";
+      confirmBtn.removeEventListener("click", handleConfirm);
+      cancelBtn.removeEventListener("click", handleCancel);
+    };
+    
+    confirmBtn.addEventListener("click", handleConfirm);
+    cancelBtn.addEventListener("click", handleCancel);
+  });
+}
+
+// Request notification permission (Capacitor native or browser fallback)
 async function checkNotificationPermission(request = false) {
   if (isNativeNotifications && LocalNotifications) {
     try {
@@ -1403,6 +1498,8 @@ async function checkNotificationPermission(request = false) {
       if (permStatus.display === 'granted') {
         DOM.btnRequestNotifications.style.display = "none";
         return true;
+      } else {
+        DOM.btnRequestNotifications.style.display = "flex";
       }
       if (request && permStatus.display !== 'denied') {
         permStatus = await LocalNotifications.requestPermissions();
@@ -1414,6 +1511,7 @@ async function checkNotificationPermission(request = false) {
           return true;
         } else {
           showToast("Notifications permission denied. You can enable it in device Settings.", "error");
+          DOM.btnRequestNotifications.style.display = "flex";
           return false;
         }
       }
@@ -1431,6 +1529,8 @@ async function checkNotificationPermission(request = false) {
     if (Notification.permission === "granted") {
       DOM.btnRequestNotifications.style.display = "none";
       return true;
+    } else {
+      DOM.btnRequestNotifications.style.display = "flex";
     }
     if (request && Notification.permission === "default") {
       const permission = await Notification.requestPermission();
